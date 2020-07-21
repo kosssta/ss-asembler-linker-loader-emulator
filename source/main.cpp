@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <string.h>
 #include "assembler.hpp"
 using namespace std;
 
@@ -10,13 +11,19 @@ int main(int argc, char *argv[]) {
     }
 
     string output_file = "a.out";
-    string input_file;
+    string input_file = "";
 
-    for (int i = 1; i < argc; i++) {
-        if (argv[i] == "-o") {
-            output_file = argv[i++ + 1];
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-o") == 0) {
+            if (i + 1 < argc)
+                output_file = argv[++i];
+            else {
+                cout << "Greska u sintaksi" << endl;
+                return 0;
+            }
+        } else {
+            input_file = argv[i];
         }
-        input_file = argv[i];
     }
 
     Assembler assembler;
