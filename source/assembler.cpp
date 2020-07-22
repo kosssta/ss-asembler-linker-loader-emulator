@@ -54,13 +54,13 @@ void Assembler::assembly(string input_file, string output_file)
 
                 cout << res << endl;
             }
-            /*if (line_number > 0)
+            if (line_number > 0)
             {
                 cout << instr->operation << endl;
                 cout << instr->op1 << endl;
                 cout << instr->op2 << endl;
                 cout << (instr->isDirective ? "true" : "false") << endl;
-            }*/
+            }
             ++line_number;
         }
         catch (SyntaxError err)

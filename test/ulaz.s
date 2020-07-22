@@ -40,3 +40,6 @@ main:
 3:
 	.align 8
 4:
+.equ D, A + 10 -0x5
+.equ C + 2,D- 4
+.equ A+4, B
