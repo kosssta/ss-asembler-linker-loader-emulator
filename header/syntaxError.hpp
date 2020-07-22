@@ -1,5 +1,6 @@
 #include <exception>
 #include <string>
+#include <iostream>
 using namespace std;
 
 class SyntaxError : public exception
@@ -20,7 +21,18 @@ public:
         string message = "";
         if (line_number != 0)
         {
-            message += "Line " + line_number;
+            message += "Line ";
+
+            // converting line_number to ASCII
+            string number = "";
+            do {
+                number += line_number % 10 + '0';
+                line_number /= 10;
+            } while(line_number > 0);
+
+            for (int i = number.length() - 1; i >= 0; --i) {
+                message += number[i];
+            }
             message += ": ";
         }
         message += error_message;

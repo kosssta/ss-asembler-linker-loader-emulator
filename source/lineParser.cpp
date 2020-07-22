@@ -8,8 +8,9 @@ Instruction* LineParser::parse(string line) {
     smatch sm;
     bool isDirective = false;
 
-    if (!regex_match(line, sm, regex("\\s*(?:([A-Za-z][A-Za-z0-9_]*)\\s*:\\s*){0,1}(?:([A-Za-z]+)\\s+([A-Za-z0-9_]+)\\s*(?:,\\s*([A-Za-z0-9_]+)\\s*)*){0,1}"))) {
-        if(!regex_match(line, sm, regex("\\s*(?:([A-Za-z][A-Za-z0-9_]*)\\s*:\\s*){0,1}(?:\\.([A-Za-z]+)\\s*(?:\\s+([A-Za-z0-9_]+)\\s*){0,1}(?:,\\s*([A-Za-z0-9_,\\s]+)\\s*)*)*"))) {
+    // strings issue
+    if (!regex_match(line, sm, regex("\\s*(?:([A-Za-z0-9_\\.][A-Za-z0-9_]*)\\s*:\\s*){0,1}(?:([A-Za-z0-9_]+)(?:\\s+([^,\\s]+)\\s*(?:,\\s*([^,\\s]+)\\s*)*){0,1}){0,1}"))) {
+        if(!regex_match(line, sm, regex("\\s*(?:([A-Za-z0-9_\\.][A-Za-z0-9_]*)\\s*:\\s*){0,1}(?:\\.([A-Za-z0-9_\\.]+)\\s*(?:(?:\\s+([^,\\s]+)\\s*,{0,1})(?:\\s*(.+)\\s*)*)*){0,1}"))) {
             throw SyntaxError("Syntax Error");
         }
 

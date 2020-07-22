@@ -42,15 +42,25 @@ void Assembler::assembly(string input_file, string output_file)
                 if (instr->op2 != "")
                 {
                     if (instr->op1 != "")
-                        res += ", ";
-                    if(instr->isDirective) {
-                        
+                        if (instr->op1[instr->op1.length() - 1] != ',')
+                            res += ", ";
+                        else
+                            res += ' ';
+                    if (instr->isDirective)
+                    {
                     }
                     res += instr->op2;
                 }
 
                 cout << res << endl;
             }
+            /*if (line_number > 0)
+            {
+                cout << instr->operation << endl;
+                cout << instr->op1 << endl;
+                cout << instr->op2 << endl;
+                cout << (instr->isDirective ? "true" : "false") << endl;
+            }*/
             ++line_number;
         }
         catch (SyntaxError err)

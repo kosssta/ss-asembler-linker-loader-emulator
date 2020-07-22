@@ -28,7 +28,7 @@ main:
 	.align 8
 	.long	 1f - 0f
 	.long	 4f - 1f
-	.long	 5
+	.long	 5,6,7 , 8
 0:
 	.string	 "GNU"
 1:
