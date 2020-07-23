@@ -5,6 +5,7 @@
 #include "instruction.hpp"
 #include "lineParser.hpp"
 #include "syntaxError.hpp"
+#include "section.hpp"
 using namespace std;
 
 void Assembler::assembly(string input_file, string output_file)
@@ -21,46 +22,13 @@ void Assembler::assembly(string input_file, string output_file)
 
             if (instr)
             {
-                string res = "";
-                if (instr->label != "")
-                {
-                    res += instr->label + ": ";
-                }
-
-                if (instr->operation != "")
-                {
-                    if (instr->isDirective)
-                        res += '.';
-                    res += instr->operation + " ";
-                }
-
-                if (instr->op1 != "")
-                {
-                    res += instr->op1;
-                }
-
-                if (instr->op2 != "")
-                {
-                    if (instr->op1 != "")
-                        if (instr->op1[instr->op1.length() - 1] != ',')
-                            res += ", ";
-                        else
-                            res += ' ';
-                    if (instr->isDirective)
-                    {
-                    }
-                    res += instr->op2;
-                }
-
-                cout << res << endl;
+                processLabel(instr->label);
+                if (instr->isDirective)
+                    processDirective(instr);
+                else
+                    processCommand(instr);
             }
-            if (line_number > 0)
-            {
-                cout << instr->operation << endl;
-                cout << instr->op1 << endl;
-                cout << instr->op2 << endl;
-                cout << (instr->isDirective ? "true" : "false") << endl;
-            }
+            delete instr;
             ++line_number;
         }
         catch (SyntaxError err)
@@ -71,4 +39,37 @@ void Assembler::assembly(string input_file, string output_file)
     }
 
     input.close();
+}
+
+void Assembler::processCommand(Instruction *instr)
+{
+    if (instr->operation == "")
+        return;
+    if (current_section == nullptr)
+        throw SyntaxError("Every command needs to be in a section");
+
+    unordered_map<string, InstructionDetails *>::const_iterator name = INSTRUCTIONS.find(instr->operation);
+    if (name == INSTRUCTIONS.end())
+        throw SyntaxError("Unrecognized token " + instr->operation);
+}
+
+void Assembler::processDirective(Instruction *instr)
+{
+    if (instr->operation == "")
+        return;
+    if (instr->operation == "section" || instr->operation == "text" || instr->operation == "data" || instr->operation == "bss" || instr->operation == "rodata")
+    {
+        current_section = new Section();
+        cout << "Current section: " << (instr->op1 != "" ? instr->op1 : instr->operation) << endl;
+    }
+    else if (instr->operation == "end")
+        current_section = nullptr;
+}
+
+void Assembler::processLabel(string label)
+{
+    if (label == "")
+        return;
+
+    symbolTable.insertSymbol(label, location_counter, current_section);
 }

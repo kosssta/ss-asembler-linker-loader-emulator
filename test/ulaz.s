@@ -1,7 +1,7 @@
 	.file	"progr.c"
 	.intel_syntax noprefix
 	.text
-	.section	.rodata.str1.1,"aMS",@progbits,1
+	.section	.rodata
 .LC0:
 	.string	"Hello, World"
 	.text
@@ -23,8 +23,8 @@ main:
 .LFE23:
 	.size	main, .-main
 	.ident	"GCC: (Ubuntu 9.3.0-10ubuntu2) 9.3.0"
-	.section	.note.GNU-stack,"",@progbits
-	.section	.note.gnu.property,"a"
+	.section	.note.GNU-stack
+	.section	.note.gnu.property
 	.align 8
 	.long	 1f - 0f
 	.long	 4f - 1f

@@ -1,3 +1,6 @@
+#ifndef SYNTAXERROR_H_
+#define SYNTAXERROR_H_
+
 #include <exception>
 #include <string>
 #include <iostream>
@@ -49,3 +52,5 @@ public:
         this->error_message = error_message;
     }
 };
+
+#endif
