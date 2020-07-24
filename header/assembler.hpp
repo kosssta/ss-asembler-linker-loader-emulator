@@ -17,7 +17,6 @@ public:
     void assembly(string input_file, string output_file);
 
 private:
-    unsigned location_counter = 0;
     SymbolTable symbolTable;
     SectionTable sectionTable;
     Section* current_section = nullptr;

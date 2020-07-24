@@ -3,6 +3,10 @@
 #include <iostream>
 using namespace std;
 
+SectionTable::SectionTable() {
+    global = new Section();
+}
+
 Section* SectionTable::addSection(string name, Section *section) {
     unordered_map<string, Section*>::iterator ret = sections.find(name);
     if(ret != sections.end()) {

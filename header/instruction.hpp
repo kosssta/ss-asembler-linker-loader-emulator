@@ -72,38 +72,41 @@ const unordered_map<string, InstructionDetails *> INSTRUCTIONS = {
 
 struct RegisterDetails
 {
+    char code;
     char size;
+    bool high;
 
-    RegisterDetails(char sz = 2) : size(sz) {}
+    RegisterDetails(char cd, char sz = 2, bool hgh = false) : code(cd), size(sz), high(hgh) {}
 };
 
 const unordered_map<string, RegisterDetails *> REGISTERS = {
-    {"r0", new RegisterDetails()},
-    {"r1", new RegisterDetails()},
-    {"r2", new RegisterDetails()},
-    {"r3", new RegisterDetails()},
-    {"r4", new RegisterDetails()},
-    {"r5", new RegisterDetails()},
-    {"r6", new RegisterDetails()},
-    {"r7", new RegisterDetails()},
-    {"r0h", new RegisterDetails(2)},
-    {"r1h", new RegisterDetails(2)},
-    {"r2h", new RegisterDetails(2)},
-    {"r3h", new RegisterDetails(2)},
-    {"r4h", new RegisterDetails(2)},
-    {"r5h", new RegisterDetails(2)},
-    {"r6h", new RegisterDetails(2)},
-    {"r7h", new RegisterDetails(2)},
-    {"r0l", new RegisterDetails(2)},
-    {"r1l", new RegisterDetails(2)},
-    {"r2l", new RegisterDetails(2)},
-    {"r3l", new RegisterDetails(2)},
-    {"r4l", new RegisterDetails(2)},
-    {"r5l", new RegisterDetails(2)},
-    {"r6l", new RegisterDetails(2)},
-    {"r7l", new RegisterDetails(2)},
-    {"pc", new RegisterDetails(2)},
-    {"sp", new RegisterDetails(2)}
+    {"r0", new RegisterDetails(0)},
+    {"r1", new RegisterDetails(1)},
+    {"r2", new RegisterDetails(2)},
+    {"r3", new RegisterDetails(3)},
+    {"r4", new RegisterDetails(4)},
+    {"r5", new RegisterDetails(5)},
+    {"r6", new RegisterDetails(6)},
+    {"r7", new RegisterDetails(7)},
+    {"r0h", new RegisterDetails(0, 1, true)},
+    {"r1h", new RegisterDetails(1, 1, true)},
+    {"r2h", new RegisterDetails(2, 1, true)},
+    {"r3h", new RegisterDetails(3, 1, true)},
+    {"r4h", new RegisterDetails(4, 1, true)},
+    {"r5h", new RegisterDetails(5, 1, true)},
+    {"r6h", new RegisterDetails(6, 1, true)},
+    {"r7h", new RegisterDetails(7, 1, true)},
+    {"r0l", new RegisterDetails(0, 1)},
+    {"r1l", new RegisterDetails(1, 1)},
+    {"r2l", new RegisterDetails(2, 1)},
+    {"r3l", new RegisterDetails(3, 1)},
+    {"r4l", new RegisterDetails(4, 1)},
+    {"r5l", new RegisterDetails(5, 1)},
+    {"r6l", new RegisterDetails(6, 1)},
+    {"r7l", new RegisterDetails(7, 1)},
+    {"pc", new RegisterDetails(7)},
+    {"sp", new RegisterDetails(6)},
+    {"psw", new RegisterDetails(15)}
 };
 
 struct Instruction

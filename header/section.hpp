@@ -9,6 +9,7 @@ typedef int8_t byte;
 
 struct Section {
     Array bytes;
+    unsigned location_counter = 0;
     char access_rights = 0;
 };
 

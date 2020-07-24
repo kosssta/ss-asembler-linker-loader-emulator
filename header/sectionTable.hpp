@@ -8,8 +8,10 @@ struct Section;
 
 class SectionTable {
     unordered_map<string, Section*> sections;
-
+    
     public:
+    Section *global = nullptr;
+    SectionTable();
     Section* addSection(string name, Section *section);
     Section* findSection(string name) const;
     void write() const;

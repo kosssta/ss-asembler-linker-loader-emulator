@@ -62,7 +62,7 @@ void Assembler::processCommand(Instruction *instr)
     if (instruction->num_operands == 0)
     {
         current_section->bytes.add(op_code);
-        ++location_counter;
+        ++current_section->location_counter;
         return;
     }
 
@@ -74,7 +74,7 @@ void Assembler::processCommand(Instruction *instr)
     }
 
     current_section->bytes.add(op_code);
-    ++location_counter;
+    ++current_section->location_counter;
 
     if (instruction->jump)
     {
@@ -88,11 +88,135 @@ void Assembler::processCommand(Instruction *instr)
             string operand = sm[1];
             if (operand[0] == '*')
             {
+                // *%r<num>
+                if (operand[1] == '%')
+                {
+                    operand.erase(0, 2);
+                    unordered_map<string, RegisterDetails *>::const_iterator reg = REGISTERS.find(operand);
+                    if (reg == REGISTERS.end())
+                        throw SyntaxError("Unrecognized token: " + operand);
+
+                    RegisterDetails *r = reg->second;
+
+                    if (r->size == 1)
+                        current_section->bytes.set(current_section->location_counter - 1, current_section->bytes.get(current_section->location_counter - 1) & ~(1 << 2));
+                    current_section->bytes.add(1 << 5 | r->code << 1 | (r->size == 1 && r->high ? 1 : 0));
+                    ++current_section->location_counter;
+                }
+                // *<literal> ili *<simbol>
+                else
+                {
+                    operand.erase(0);
+                    current_section->bytes.add(4 << 5);
+                    ++current_section->location_counter;
+
+                    word number;
+                    if (isLiteral(operand))
+                        number = parseInt(operand);
+                    else
+                    {
+                        SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
+                        if (symb)
+                            number = symb->value;
+                        else
+                        {
+                            number = 0;
+                            symbolTable.insertSymbol(operand, false);
+                            symb = symbolTable.getSymbol(operand);
+                            symb->defined = false;
+                            symb->addFLink(current_section ? current_section : sectionTable.global, current_section->location_counter, 2);
+                        }
+                    }
+                    byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
+                    current_section->bytes.add(array, 2);
+                    current_section->location_counter += 2;
+                }
             }
+            // <literal> ili <simbol>
             else
             {
-                current_section->bytes.add(4 << 5);
-                ++location_counter;
+                current_section->bytes.add(0 << 5);
+                ++current_section->location_counter;
+
+                word number;
+                if (isLiteral(operand))
+                    number = parseInt(operand);
+                else
+                {
+                    SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
+                    if (symb && symb->defined)
+                        number = symb->value;
+                    else
+                    {
+                        number = 0;
+                        if (!symb)
+                        {
+                            symbolTable.insertSymbol(operand, false);
+                            symb = symbolTable.getSymbol(operand);
+                        }
+                        symb->addFLink(current_section ? current_section : sectionTable.global, current_section->location_counter, 2);
+                    }
+                }
+                byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
+                current_section->bytes.add(array, 2);
+                current_section->location_counter += 2;
+            }
+        }
+        // ()
+        else
+        {
+            string operand = sm[2];
+            if (operand[0] != '*')
+                throw SyntaxError("Invalid syntax: " + operand);
+
+            operand.erase(0, 1);
+
+            // *(%r<num>)
+            if (operand == "")
+            {
+                operand = sm[3];
+                if (operand[0] != '%')
+                {
+                    string tmp = sm[2];
+                    throw SyntaxError("Invalid syntax: " + tmp + operand);
+                }
+
+                operand.erase(0, 1);
+                unordered_map<string, RegisterDetails *>::const_iterator reg = REGISTERS.find(operand);
+                if (reg == REGISTERS.end())
+                    throw SyntaxError("Unrecognized token: " + operand);
+
+                RegisterDetails *r = reg->second;
+
+                if (r->size == 1)
+                    current_section->bytes.set(current_section->location_counter - 1, current_section->bytes.get(current_section->location_counter - 1) & ~(1 << 2));
+                current_section->bytes.add(2 << 5 | r->code << 1 | (r->size == 1 && r->high ? 1 : 0));
+                ++current_section->location_counter;
+            }
+            // *<literal>(%r<num>) ili *<simbol>(%r<num>) ili *<simbol>(%pc/%r7)
+            else
+            {
+                operand = sm[3];
+                if (operand[0] != '%')
+                {
+                    string tmp = sm[2];
+                    throw SyntaxError("Invalid syntax: " + tmp + operand);
+                }
+
+                operand.erase(0, 1);
+                unordered_map<string, RegisterDetails *>::const_iterator reg = REGISTERS.find(operand);
+                if (reg == REGISTERS.end())
+                    throw SyntaxError("Unrecognized token: " + operand);
+
+                RegisterDetails *r = reg->second;
+
+                if (r->size == 1)
+                    current_section->bytes.set(current_section->location_counter - 1, current_section->bytes.get(current_section->location_counter - 1) & ~(1 << 2));
+                current_section->bytes.add(3 << 5 | r->code << 1 | (r->size == 1 && r->high ? 1 : 0));
+                ++current_section->location_counter;
+
+                operand = sm[2];
+                operand.erase(0, 1);
 
                 word number;
                 if (isLiteral(operand))
@@ -108,16 +232,13 @@ void Assembler::processCommand(Instruction *instr)
                         symbolTable.insertSymbol(operand, false);
                         symb = symbolTable.getSymbol(operand);
                         symb->defined = false;
-                        symb->addFLink(location_counter, 2);
+                        symb->addFLink(current_section ? current_section : sectionTable.global, current_section->location_counter, 2);
                     }
                 }
                 byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
                 current_section->bytes.add(array, 2);
-                location_counter += 2;
+                current_section->location_counter += 2;
             }
-        }
-        else
-        {
         }
 
         return;
@@ -132,7 +253,6 @@ void Assembler::processDirective(Instruction *instr)
     {
         current_section = new Section();
         current_section = sectionTable.addSection(instr->op1 != "" ? instr->op1 : instr->operation, current_section);
-        location_counter = 0;
     }
     else if (instr->operation == "end")
         current_section = nullptr;
@@ -143,7 +263,10 @@ void Assembler::processLabel(string label)
     if (label == "")
         return;
 
-    symbolTable.insertSymbol(label, true, location_counter, current_section);
+    if (!current_section)
+        throw SyntaxError("Every symbol needs to be in a section");
+
+    symbolTable.insertSymbol(label, true, current_section->location_counter, current_section);
 }
 
 bool Assembler::isLiteral(string arg) const

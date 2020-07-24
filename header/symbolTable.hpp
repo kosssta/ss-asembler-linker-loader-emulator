@@ -12,11 +12,12 @@ class SymbolTable
 public:
     struct FLink
     {
+        Section *section;
         unsigned location;
         char size;
         FLink *next;
 
-        FLink(unsigned location, char size, FLink *next = nullptr) : location(location), size(size), next(next) {}
+        FLink(Section *section, unsigned location, char size, FLink *next = nullptr) : section(section), location(location), size(size), next(next) {}
     };
 
     struct Symbol
@@ -30,8 +31,8 @@ public:
         FLink *flink = nullptr;
         Symbol *next = nullptr;
 
-        void addFLink(unsigned location, char size) {
-            flink = new FLink(location, size, flink);
+        void addFLink(Section *section, unsigned location, char size) {
+            flink = new FLink(section, location, size, flink);
         }
         void clearFLink();
     };

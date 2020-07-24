@@ -9,7 +9,8 @@ unsigned SymbolTable::insertSymbol(string name, bool defined, long value, Sectio
     {
         symb = new Symbol();
         symb->name = name;
-        symb->section = section;
+        if (defined)
+            symb->section = section;
         symb->value = value;
         symb->global = false;
         symb->defined = defined;
@@ -25,7 +26,8 @@ unsigned SymbolTable::insertSymbol(string name, bool defined, long value, Sectio
     {
         symb->defined = defined;
         symb->value = value;
-        symb->section = section;
+        if (defined)
+            symb->section = section;
         symb->clearFLink();
     }
     return 0;
@@ -59,7 +61,7 @@ void SymbolTable::Symbol::clearFLink()
     while (flink)
     {
         if (flink->size == 1)
-            section->bytes.set(flink->location, (byte)value);
+            flink->section->bytes.set(flink->location, (byte)value);
         else
         {
             byte *array = new byte[flink->size];
@@ -69,7 +71,7 @@ void SymbolTable::Symbol::clearFLink()
                 array[i] = tmp & 0xff;
                 tmp >>= 8;
             }
-            section->bytes.set(flink->location, array, flink->size);
+            flink->section->bytes.set(flink->location, array, flink->size);
             delete array;
         }
         flink = flink->next;
