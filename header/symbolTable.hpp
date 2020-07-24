@@ -13,9 +13,10 @@ public:
     struct FLink
     {
         unsigned location;
+        char size;
         FLink *next;
 
-        FLink(unsigned location, FLink *next = nullptr) : location(location), next(next) {}
+        FLink(unsigned location, char size, FLink *next = nullptr) : location(location), size(size), next(next) {}
     };
 
     struct Symbol
@@ -29,13 +30,13 @@ public:
         FLink *flink = nullptr;
         Symbol *next = nullptr;
 
-        void addFLink(unsigned location) {
-            flink = new FLink(location, flink);
+        void addFLink(unsigned location, char size) {
+            flink = new FLink(location, size, flink);
         }
         void clearFLink();
     };
 
-    unsigned insertSymbol(string name, long value, Section *section = nullptr);
+    unsigned insertSymbol(string name, bool defined, long value = 0, Section *section = nullptr);
     Symbol* getSymbol(string name);
     void setSymbolGlobal(string name);
 private:

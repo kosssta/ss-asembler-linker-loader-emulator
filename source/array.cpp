@@ -1,4 +1,6 @@
 #include "array.hpp"
+#include <stdexcept>
+using namespace std;
 
 void Array::add(byte value)
 {
@@ -44,5 +46,29 @@ void Array::shrink()
         }
         delete array;
         array = new_array;
+    }
+}
+
+byte Array::get(unsigned index)
+{
+    if (index >= size)
+        throw out_of_range("Index out of range");
+    return array[index];
+}
+
+void Array::set(unsigned index, byte value)
+{
+    byte tmp[] = {value};
+    set(index, tmp, 1);
+}
+
+void Array::set(unsigned index, byte values[], unsigned size)
+{
+    if (index + size > length())
+        throw out_of_range("Index out of range");
+
+    for (unsigned i = 0; size > 0; --size, ++i)
+    {
+        array[i + index] = values[i];
     }
 }

@@ -5,7 +5,7 @@
 #include "array.hpp"
 using namespace std;
 
-typedef char byte;
+typedef int8_t byte;
 
 struct Section {
     Array bytes;

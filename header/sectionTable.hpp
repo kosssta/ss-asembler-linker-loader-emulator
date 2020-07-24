@@ -11,7 +11,8 @@ class SectionTable {
 
     public:
     Section* addSection(string name, Section *section);
-    Section* findSection(string name);
+    Section* findSection(string name) const;
+    void write() const;
 };
 
 #endif

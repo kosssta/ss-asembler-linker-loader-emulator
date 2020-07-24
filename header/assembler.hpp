@@ -3,7 +3,10 @@
 
 #include <string>
 #include "symbolTable.hpp"
+#include "sectionTable.hpp"
 using namespace std;
+
+typedef int16_t word;
 
 struct Instruction;
 struct Section;
@@ -16,11 +19,14 @@ public:
 private:
     unsigned location_counter = 0;
     SymbolTable symbolTable;
+    SectionTable sectionTable;
     Section* current_section = nullptr;
 
     void processDirective(Instruction *instr);
     void processCommand(Instruction *instr);
     void processLabel(string label);
+    bool isLiteral(string arg) const;
+    word parseInt(string arg) const;
 };
 
 #endif

@@ -10,20 +10,21 @@ struct InstructionDetails
     unsigned operation_code;
     char num_operands;
     char operand_size;
+    bool jump;
 
-    InstructionDetails(unsigned oc, char op = 0, char sz = -1) : operation_code(oc), num_operands(op), operand_size(sz) {}
+    InstructionDetails(unsigned oc, char op = 0, char sz = -1, bool jmp = false) : operation_code(oc), num_operands(op), operand_size(sz), jump(jmp) {}
 };
 
 const unordered_map<string, InstructionDetails *> INSTRUCTIONS = {
     {"halt", new InstructionDetails(0)},
     {"iret", new InstructionDetails(1)},
     {"ret", new InstructionDetails(2)},
-    {"int", new InstructionDetails(3, 1, 2)},
-    {"call", new InstructionDetails(4, 1, 2)},
-    {"jmp", new InstructionDetails(5, 1, 2)},
-    {"jeq", new InstructionDetails(6, 1, 2)},
-    {"jne", new InstructionDetails(7, 1, 2)},
-    {"jgt", new InstructionDetails(8, 1, 2)},
+    {"int", new InstructionDetails(3, 1, 2, true)},
+    {"call", new InstructionDetails(4, 1, 2, true)},
+    {"jmp", new InstructionDetails(5, 1, 2, true)},
+    {"jeq", new InstructionDetails(6, 1, 2, true)},
+    {"jne", new InstructionDetails(7, 1, 2, true)},
+    {"jgt", new InstructionDetails(8, 1, 2, true)},
     {"push", new InstructionDetails(9, 1, 2)},
     {"pop", new InstructionDetails(10, 1, 2)},
     {"xchg", new InstructionDetails(11, 2)},
@@ -67,7 +68,42 @@ const unordered_map<string, InstructionDetails *> INSTRUCTIONS = {
     {"shlb", new InstructionDetails(23, 2, 1)},
     {"shr", new InstructionDetails(24, 2)},
     {"shrw", new InstructionDetails(24, 2, 2)},
-    {"shrb", new InstructionDetails(24, 2, 1)}
+    {"shrb", new InstructionDetails(24, 2, 1)}};
+
+struct RegisterDetails
+{
+    char size;
+
+    RegisterDetails(char sz = 2) : size(sz) {}
+};
+
+const unordered_map<string, RegisterDetails *> REGISTERS = {
+    {"r0", new RegisterDetails()},
+    {"r1", new RegisterDetails()},
+    {"r2", new RegisterDetails()},
+    {"r3", new RegisterDetails()},
+    {"r4", new RegisterDetails()},
+    {"r5", new RegisterDetails()},
+    {"r6", new RegisterDetails()},
+    {"r7", new RegisterDetails()},
+    {"r0h", new RegisterDetails(2)},
+    {"r1h", new RegisterDetails(2)},
+    {"r2h", new RegisterDetails(2)},
+    {"r3h", new RegisterDetails(2)},
+    {"r4h", new RegisterDetails(2)},
+    {"r5h", new RegisterDetails(2)},
+    {"r6h", new RegisterDetails(2)},
+    {"r7h", new RegisterDetails(2)},
+    {"r0l", new RegisterDetails(2)},
+    {"r1l", new RegisterDetails(2)},
+    {"r2l", new RegisterDetails(2)},
+    {"r3l", new RegisterDetails(2)},
+    {"r4l", new RegisterDetails(2)},
+    {"r5l", new RegisterDetails(2)},
+    {"r6l", new RegisterDetails(2)},
+    {"r7l", new RegisterDetails(2)},
+    {"pc", new RegisterDetails(2)},
+    {"sp", new RegisterDetails(2)}
 };
 
 struct Instruction
