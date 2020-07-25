@@ -20,12 +20,14 @@ private:
     SymbolTable symbolTable;
     SectionTable sectionTable;
     Section* current_section = nullptr;
+    bool end = false;
 
     void processDirective(Instruction *instr);
     void processCommand(Instruction *instr);
     void processLabel(string label);
     bool isLiteral(string arg) const;
     word parseInt(string arg) const;
+    unsigned parseArgs(string args, word *values);
 };
 
 #endif

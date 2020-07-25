@@ -53,6 +53,7 @@ void SymbolTable::setSymbolGlobal(string name)
         symb->global = true;
         symb->defined = false;
         symb->id = nextId++;
+        symbols[name] = symb;
     }
 }
 
@@ -75,5 +76,15 @@ void SymbolTable::Symbol::clearFLink()
             delete array;
         }
         flink = flink->next;
+    }
+}
+
+void SymbolTable::write() const {
+    cout << "Symbol table" << endl;
+    cout << "Name\t" << "Value\t" << "Section\t" << "Defined\t" << "Global\t" << "Id\t" << endl;
+    for(auto& symb: symbols) {
+        Symbol *s = symb.second;
+        cout << s->name << '\t' << s->value << '\t' << ((long)s->section & 0xffff) << '\t' << (s->defined ? "true" : "false") << '\t'
+        << (s->global ? "true" : "false") << '\t' << s->id << endl;
     }
 }

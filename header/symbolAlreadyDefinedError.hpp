@@ -5,7 +5,7 @@
 
 class SymbolAlreadyDefinedError : public SyntaxError {
     public:
-    SymbolAlreadyDefinedError(string symbol_name) : SyntaxError("Symbol " + symbol_name + " already defined") {}
+    SymbolAlreadyDefinedError(string symbol_name) : SyntaxError("Symbol " + symbol_name + " is already defined") {}
 };
 
 #endif

@@ -40,6 +40,7 @@ public:
     unsigned insertSymbol(string name, bool defined, long value = 0, Section *section = nullptr);
     Symbol* getSymbol(string name);
     void setSymbolGlobal(string name);
+    void write() const;
 private:
     unordered_map<string, Symbol*> symbols;
     unsigned nextId = 1;
