@@ -41,8 +41,10 @@ public:
     Symbol* getSymbol(string name);
     void setSymbolGlobal(string name);
     void write() const;
+    void insertExternSymbol(string name);
 private:
     unordered_map<string, Symbol*> symbols;
+    unordered_map<string, string> externSymbols;
     unsigned nextId = 1;
 };
 

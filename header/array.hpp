@@ -7,6 +7,7 @@ using namespace std;
 #define INITIAL_SIZE 10
 
 typedef int8_t byte;
+typedef int16_t word;
 
 class Array { 
     byte *array = new byte[INITIAL_SIZE];
@@ -18,6 +19,7 @@ class Array {
     public:
     void add(byte value);
     void add(byte values[], unsigned size);
+    void skip(unsigned number);
     unsigned length() const;
     void shrink();
     byte get(unsigned index);

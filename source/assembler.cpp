@@ -51,26 +51,39 @@ void Assembler::processCommand(Instruction *instr)
     if (instr->operation == "")
         return;
     if (current_section == nullptr)
-        throw SyntaxError("Every command needs to be in a section");
+        throw SyntaxError("Every instruction needs to be in a section");
 
-    unordered_map<string, InstructionDetails *>::const_iterator name = INSTRUCTIONS.find(instr->operation);
+    const auto& name = INSTRUCTIONS.find(instr->operation);
     if (name == INSTRUCTIONS.end())
         throw SyntaxError("Unrecognized token " + instr->operation);
 
-    InstructionDetails *instruction = name->second;
+    InstructionDetails *instructionDetails = name->second;
 
-    byte op_code = instruction->operation_code << 3;
+    byte op_code = instructionDetails->operation_code << 3;
 
-    if (instruction->num_operands == 0)
+    if (instructionDetails->num_operands == 0)
     {
+        if (instr->op1 != "" || instr->op2 != "")
+            throw SyntaxError("Instruction has no arguments.");
+
         current_section->bytes.add(op_code);
         ++current_section->location_counter;
         return;
     }
+    else if (instructionDetails->num_operands == 1)
+    {
+        if (instr->op1 == "" || instr->op2 != "")
+            throw SyntaxError("Instruction needs 1 argument");
+    }
+    else
+    {
+        if (instr->op1 == "" || instr->op2 == "")
+            throw SyntaxError("Instruction needs 2 arguments");
+    }
 
-    if (instruction->operand_size == 2)
+    if (instructionDetails->operand_size == 2)
         op_code |= 1 << 2;
-    else if (instruction->operand_size == -1)
+    else if (instructionDetails->operand_size == -1)
     {
         op_code |= 1 << 2;
     }
@@ -83,7 +96,7 @@ void Assembler::processCommand(Instruction *instr)
     if (!regex_match(instr->op1, sm, regex(operand_regex)))
         throw SyntaxError("Error - not matched");
 
-    if (instruction->jump)
+    if (instructionDetails->jump)
     {
         if (sm[1] != "")
         {
@@ -568,8 +581,11 @@ void Assembler::processDirective(Instruction *instr)
 
     if (instr->operation == "section" || instr->operation == "text" || instr->operation == "data" || instr->operation == "bss" || instr->operation == "rodata")
     {
+        if (instr->op2 != "" || instr->operation != "section" && instr->op1 != "")
+            throw SyntaxError("Syntax error");
+
         current_section = new Section();
-        string name = instr->op1 != "" ? instr->op1 : instr->operation;
+        string name = instr->op1 != "" ? instr->op1.substr(1) : instr->operation;
         Section *ret = sectionTable.addSection(name, current_section);
         if (current_section == ret)
         {
@@ -580,6 +596,9 @@ void Assembler::processDirective(Instruction *instr)
     }
     else if (instr->operation == "end")
     {
+        if (instr->op1 != "" || instr->op2 != "")
+            throw SyntaxError("Syntax error");
+
         current_section = nullptr;
         end = true;
     }
@@ -591,14 +610,22 @@ void Assembler::processDirective(Instruction *instr)
 
         string name = "";
         string ch = "";
+        bool space = false;
         for (unsigned i = 0; i < instr->op2.length(); ++i)
         {
             if (instr->op2[i] == ',' && name != "")
             {
                 symbolTable.setSymbolGlobal(name);
                 name = "";
+                space = false;
             }
-            else
+            else if (instr->op2[i] == ' ' && name != "")
+            {
+                space = true;
+            }
+            else if (space && instr->op2[i] != ',')
+                throw SyntaxError("Syntax error");
+            else if (instr->op2[i] != ' ')
             {
                 ch = instr->op2[i];
                 name.append(ch);
@@ -609,15 +636,138 @@ void Assembler::processDirective(Instruction *instr)
     }
     else if (instr->operation == "extern")
     {
+        if (instr->op1 == "")
+            throw SyntaxError(".extern needs at least 1 operand");
+        symbolTable.insertExternSymbol(instr->op1);
+
+        string name = "";
+        string ch = "";
+        bool space = false;
+        for (unsigned i = 0; i < instr->op2.length(); ++i)
+        {
+            if (instr->op2[i] == ',' && name != "")
+            {
+                symbolTable.insertExternSymbol(name);
+                name = "";
+                space = false;
+            }
+            else if (instr->op2[i] == ' ' && name != "")
+            {
+                space = true;
+            }
+            else if (space && instr->op2[i] != ',')
+                throw SyntaxError("Syntax error");
+            else if (instr->op2[i] != ' ')
+            {
+                ch = instr->op2[i];
+                name.append(ch);
+            }
+        }
+        if (name != "")
+            symbolTable.insertExternSymbol(name);
     }
     else if (instr->operation == "byte")
     {
+        if (instr->op1 == "")
+            throw SyntaxError(".byte needs at least 1 operand");
+        if (current_section == nullptr)
+            throw SyntaxError("Every command needs to be in a section");
+
+        word number = parseOperand(instr->op1, true);
+        current_section->bytes.add(number & 0xff);
+        ++current_section->location_counter;
+
+        string name = "";
+        string ch = "";
+        bool space = false;
+        for (unsigned i = 0; i < instr->op2.length(); ++i)
+        {
+            if (instr->op2[i] == ',' && name != "")
+            {
+                number = parseOperand(name, true);
+                current_section->bytes.add(number & 0xff);
+                ++current_section->location_counter;
+                name = "";
+                space = false;
+            }
+            else if (instr->op2[i] == ' ' && name != "")
+            {
+                space = true;
+            }
+            else if (space && instr->op2[i] != ',')
+                throw SyntaxError("Syntax error");
+            else if (instr->op2[i] != ' ')
+            {
+                ch = instr->op2[i];
+                name.append(ch);
+            }
+        }
+        if (name != "")
+        {
+            number = parseOperand(name, true);
+            current_section->bytes.add(number & 0xff);
+            ++current_section->location_counter;
+        }
     }
     else if (instr->operation == "word")
     {
+        if (instr->op1 == "")
+            throw SyntaxError(".word needs at least 1 operand");
+        if (current_section == nullptr)
+            throw SyntaxError("Every command needs to be in a section");
+
+        word number = parseOperand(instr->op1);
+        byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
+        current_section->bytes.add(array, 2);
+        current_section->location_counter += 2;
+
+        string name = "";
+        string ch = "";
+        bool space = false;
+        for (unsigned i = 0; i < instr->op2.length(); ++i)
+        {
+            if (instr->op2[i] == ',' && name != "")
+            {
+                number = parseOperand(name);
+                array[0] = number & 0xff;
+                array[1] = (number >> 8) & 0xff;
+                current_section->bytes.add(array, 2);
+                current_section->location_counter += 2;
+                name = "";
+                space = false;
+            }
+            else if (instr->op2[i] == ' ' && name != "")
+            {
+                space = true;
+            }
+            else if (space && instr->op2[i] != ',')
+                throw SyntaxError("Syntax error");
+            else if (instr->op2[i] != ' ')
+            {
+                ch = instr->op2[i];
+                name.append(ch);
+            }
+        }
+        if (name != "")
+        {
+            number = parseOperand(name);
+            array[0] = number & 0xff;
+            array[1] = (number >> 8) & 0xff;
+            current_section->bytes.add(array, 2);
+            current_section->location_counter += 2;
+        }
     }
     else if (instr->operation == "skip")
     {
+        if (instr->op1 == "" && instr->op2 != "")
+            throw SyntaxError(".skip needs exactly 1 argument");
+
+        word number = parseOperand(instr->op1);
+        if (number < 0)
+            throw SyntaxError("Operand cannot be less than zero.");
+
+        current_section->bytes.skip(number);
+        current_section->location_counter += number;
     }
     else if (instr->operation == "equ")
     {
@@ -654,6 +804,9 @@ bool Assembler::isLiteral(string arg) const
     if (arg[0] == '\'' && arg[arg.length() - 1] == '\'' && (arg[1] != '\\' && arg.length() == 3 || arg[1] == '\\' && arg.length() == 4))
         return true;
 
+    if (arg[0] == '-')
+        arg.erase(0, 1);
+
     if (arg.length() > 2 && arg[0] == '0' && (arg[1] == 'x' || arg[1] == 'X'))
     {
         for (unsigned i = 2; i < arg.length(); ++i)
@@ -679,6 +832,12 @@ word Assembler::parseInt(string arg) const
             return arg[2];
 
     word number = 0;
+    bool minus = false;
+    if (arg[0] == '-')
+    {
+        minus = true;
+        arg.erase(0, 1);
+    }
 
     if (arg.length() > 2 && arg[0] == '0' && (arg[1] == 'x' || arg[1] == 'X'))
     {
@@ -700,7 +859,7 @@ word Assembler::parseInt(string arg) const
             number += arg[i] - '0';
         }
 
-    return number;
+    return number * (minus ? -1 : 1);
 }
 
 unsigned Assembler::parseArgs(string args, word *values)
@@ -736,4 +895,29 @@ unsigned Assembler::parseArgs(string args, word *values)
     }
     delete array;
     return cnt;
+}
+
+word Assembler::parseOperand(string operand, bool lowerByteOnly)
+{
+    word number;
+    if (isLiteral(operand))
+        number = parseInt(operand);
+    else
+    {
+        SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
+        if (symb && symb->defined)
+            number = symb->value;
+        else
+        {
+            number = 0;
+            if (!symb)
+            {
+                symbolTable.insertSymbol(operand, false);
+                symb = symbolTable.getSymbol(operand);
+            }
+            symb->addFLink(current_section ? current_section : sectionTable.global, current_section->location_counter, lowerByteOnly ? 1 : 2);
+        }
+    }
+
+    return number;
 }

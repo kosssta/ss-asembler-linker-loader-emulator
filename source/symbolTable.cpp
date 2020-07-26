@@ -87,4 +87,13 @@ void SymbolTable::write() const {
         cout << s->name << '\t' << s->value << '\t' << ((long)s->section & 0xffff) << '\t' << (s->defined ? "true" : "false") << '\t'
         << (s->global ? "true" : "false") << '\t' << s->id << endl;
     }
+    cout << endl << "Extern symbols:\n";
+    for(auto &symb: externSymbols) {
+        cout << symb.second << endl;
+    }
+    if(externSymbols.empty()) cout << "No extern symbols" << endl;
+}
+
+void SymbolTable::insertExternSymbol(string name) {
+    externSymbols[name] = name;
 }

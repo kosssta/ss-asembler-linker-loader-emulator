@@ -28,6 +28,7 @@ private:
     bool isLiteral(string arg) const;
     word parseInt(string arg) const;
     unsigned parseArgs(string args, word *values);
+    word parseOperand(string operand, bool lowerByteOnly = false);
 };
 
 #endif

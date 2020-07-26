@@ -1,4 +1,5 @@
 .global labela
+.extern nekiSimbol, opetNekiSimbol,  josSimbola  ,df
 
 .text
 loop:
@@ -9,6 +10,7 @@ push labela(%r7)
 
 
 .data
-mov 5, 6
-labela:  halt
+.word labela, 0x15, 15  ,labela   , 100
+.skip 1
+labela: .byte 255
 .end

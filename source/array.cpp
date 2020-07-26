@@ -72,3 +72,10 @@ void Array::set(unsigned index, byte values[], unsigned size)
         array[i + index] = values[i];
     }
 }
+
+void Array::skip(unsigned size)
+{
+    while (length() + size > capacity)
+        extend();
+    this->size += size;
+}
