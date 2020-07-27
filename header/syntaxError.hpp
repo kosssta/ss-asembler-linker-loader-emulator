@@ -13,7 +13,7 @@ protected:
     string error_message = "";
 
 public:
-    SyntaxError(string error_message, unsigned line_number = 0)
+    SyntaxError(string error_message = "Syntax error", unsigned line_number = 0)
     {
         this->error_message = error_message;
         this->line_number = line_number;
