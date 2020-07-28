@@ -8,8 +8,10 @@ using namespace std;
 
 bool UncalculatedSymbolsTable::Symbol::calculateValue(SymbolTable *symbTable)
 {
-    bool ret = true;
+    if(expression == "") return false;
     
+    bool ret = true;
+
     string updated_expresion = "";
     bool minusSign = false;
     unsigned i = 0;
@@ -104,20 +106,30 @@ void UncalculatedSymbolsTable::write() const
 
 bool UncalculatedSymbolsTable::calculateAll()
 {
-    bool ret = true;
+    bool change;
+    do
+    {
+        change = false;
+        for (Symbol *s : symbols)
+        {
+            bool calculated = s->calculateValue(symbTable);
+            SymbolTable::Symbol *symb = symbTable->getSymbol(s->name);
+            if (symb)
+            {
+                symb->section = s->section;
+                symb->defined = calculated;
+                symb->value = s->value;
+                symb->clearFLink();
+            }
+            change |= calculated;
+        }
+    } while (change);
 
     for (Symbol *s : symbols)
     {
-        bool calculated = s->calculateValue(symbTable);
-        SymbolTable::Symbol *symb = symbTable->getSymbol(s->name);
-        if(symb) {
-            symb->section = s->section;
-            symb->defined = calculated;
-            symb->value = s->value;
-            symb->clearFLink();
-        }
-        ret &= calculated;
+        if (s->expression != "")
+            return false;
     }
 
-    return ret;
+    return true;
 }

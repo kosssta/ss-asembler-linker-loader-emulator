@@ -5,7 +5,7 @@
 loop:
 jmp *%pc
 mov 5(%r6), $10
-push 5(%r7)
+push labela
 .equ C, +5 - 0x06 -labela
 
 

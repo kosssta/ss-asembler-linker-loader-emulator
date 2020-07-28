@@ -57,6 +57,8 @@ void Assembler::assembly(string input_file, string output_file)
     cout << endl;
     sectionTable.write();
     cout << endl;
+    relocationTable.write();
+    cout << endl;
 }
 
 void Assembler::processCommand(Instruction *instr)
@@ -154,8 +156,9 @@ void Assembler::processCommand(Instruction *instr)
                     throw SyntaxError("Invalid syntax: " + sm.str(2) + sm.str(3));
 
                 // <literal>(%r<num>) ili <simbol>(%r<num>) ili <simbol>(%pc/%r7)
-                regDir(sm.str(3).substr(1), 3);
-                literalSimbol(operand, -1);
+                string reg = sm.str(3).substr(1);
+                regDir(reg, 3);
+                literalSimbol(operand, -1, reg == "pc" || reg == "r7");
             }
         }
     }
@@ -188,7 +191,47 @@ void Assembler::processDirective(Instruction *instr)
         end = true;
     }
     else if (instr->operation == "global" || instr->operation == "extern" || instr->operation == "byte" || instr->operation == "word")
-        directive(instr->operation, instr);
+    {
+        if (instr->op1 == "")
+            throw SyntaxError("." + instr->operation + " needs at least 1 operand");
+
+        if (current_section == nullptr && (instr->operation == "byte" || instr->operation == "word"))
+            throw SyntaxError("." + instr->operation + " needs to be in a section");
+
+        vector<string> elems = Assembler::splitString(instr->op1 + ',' + instr->op2, "(?:,|[^,\\s]+)");
+        unsigned i = 0;
+
+        for (string s : elems)
+        {
+            if (i & 1)
+            {
+                if (s[0] != ',')
+                    throw SyntaxError();
+            }
+            else
+            {
+                if (s[0] == ',')
+                    throw SyntaxError();
+                else
+                {
+                    if (instr->operation == "global")
+                        symbolTable.setSymbolGlobal(s);
+                    else if (instr->operation == "extern")
+                        symbolTable.insertExternSymbol(s);
+                    else
+                    {
+                        word number = Assembler::parseOperand(s, current_section, &symbolTable, instr->operation == "byte");
+                        if (!isLiteral(s))
+                            relocationTable.add(current_section, current_section->bytes.size(), instr->operation == "byte" ? RelocationTable::R_X86_64_8 : RelocationTable::R_X86_64_16);
+                        current_section->bytes.push_back(number & 0xff);
+                        if (instr->operation == "word")
+                            current_section->bytes.push_back(number >> 8 & 0xff);
+                    }
+                }
+            }
+            ++i;
+        }
+    }
     else if (instr->operation == "skip")
     {
         if (instr->op1 == "" && instr->op2 != "")
@@ -314,50 +357,16 @@ void Assembler::regDir(string operand, byte op_code)
     current_section->bytes.push_back(op_code << 5 | r->code << 1 | (r->size == 1 && r->high ? 1 : 0));
 }
 
-void Assembler::literalSimbol(string operand, byte op_code)
+void Assembler::literalSimbol(string operand, byte op_code, bool pc_rel)
 {
     if (op_code != -1)
         current_section->bytes.push_back(op_code << 5);
 
     word number = Assembler::parseOperand(operand, current_section, &symbolTable);
+    if (!Assembler::isLiteral(operand))
+        relocationTable.add(current_section, current_section->bytes.size(), pc_rel ? RelocationTable::R_X86_64_PC16 : RelocationTable::R_X86_64_16);
     current_section->bytes.push_back(number & 0xff);
     current_section->bytes.push_back(number >> 8 & 0xff);
-}
-
-void Assembler::directive(string directive, Instruction *instr)
-{
-    if (instr->op1 == "")
-        throw SyntaxError("." + directive + " needs at least 1 operand");
-
-    if (current_section == nullptr && (directive == "byte" || directive == "word"))
-        throw SyntaxError("." + instr->operation + " needs to be in a section");
-
-    vector<string> elems = Assembler::splitString(instr->op1 + ',' + instr->op2, "(?:,|[^,\\s]+)");
-    unsigned i = 0;
-
-    for (string s : elems)
-    {
-        if (i & 1)
-        {
-            if (s[0] != ',')
-                throw SyntaxError();
-        }
-        else
-        {
-            if (s[0] == ',')
-                throw SyntaxError();
-            else
-            {
-                if (directive == "global")
-                    symbolTable.setSymbolGlobal(s);
-                else if (directive == "extern")
-                    symbolTable.insertExternSymbol(s);
-                else
-                    processWord(s, directive == "byte");
-            }
-        }
-        ++i;
-    }
 }
 
 vector<string> Assembler::splitString(string str, string regex)
@@ -372,12 +381,4 @@ vector<string> Assembler::splitString(string str, string regex)
     }
 
     return elems;
-}
-
-void Assembler::processWord(string numb, bool byteInstr)
-{
-    word number = Assembler::parseOperand(numb, current_section, &symbolTable, byteInstr);
-    current_section->bytes.push_back(number & 0xff);
-    if (!byteInstr)
-        current_section->bytes.push_back(number >> 8 & 0xff);
 }
