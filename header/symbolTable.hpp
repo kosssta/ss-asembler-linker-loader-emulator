@@ -3,9 +3,12 @@
 
 #include <string>
 #include <unordered_map>
+#include <cstdint>
 using namespace std;
 
 struct Section;
+
+typedef int16_t word;
 
 class SymbolTable
 {
@@ -23,7 +26,7 @@ public:
     struct Symbol
     {
         string name;
-        long value;
+        word value;
         Section *section = nullptr;
         bool defined;
         bool global;
@@ -37,11 +40,12 @@ public:
         void clearFLink();
     };
 
-    unsigned insertSymbol(string name, bool defined, long value = 0, Section *section = nullptr);
+    unsigned insertSymbol(string name, bool defined, word value = 0, Section *section = nullptr);
     Symbol* getSymbol(string name);
     void setSymbolGlobal(string name);
     void write() const;
     void insertExternSymbol(string name);
+
 private:
     unordered_map<string, Symbol*> symbols;
     unordered_map<string, string> externSymbols;

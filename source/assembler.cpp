@@ -79,8 +79,7 @@ void Assembler::processCommand(Instruction *instr)
         if (instr->op1 != "" || instr->op2 != "")
             throw SyntaxError("Error: Instruction should have zero arguments.");
 
-        current_section->bytes.add(op_code);
-        ++current_section->location_counter;
+        current_section->bytes.push_back(op_code);
         return;
     }
 
@@ -102,235 +101,61 @@ void Assembler::processCommand(Instruction *instr)
         op_code |= 1 << 2;
     }
 
-    current_section->bytes.add(op_code);
-    ++current_section->location_counter;
+    current_section->bytes.push_back(op_code);
 
-    smatch sm;
-    const string operand_regex = "(?:([^\\(\\)]+)|([^\\(]*)\\(([^\\)]+)\\))";
-    if (!regex_match(instr->op1, sm, regex(operand_regex)))
-        throw SyntaxError("Error - not matched");
-
-    if (instructionDetails->jump)
+    string operands[2] = {instr->op1, instr->op2};
+    for (unsigned i = 0; i < instructionDetails->num_operands; ++i)
     {
-        if (sm[1] != "")
-        {
-            string operand = sm[1];
-            if (operand[0] == '*')
-            {
-                // *%r<num>
-                if (operand[1] == '%')
-                {
-                    regDir(operand.substr(2));
-                }
-                // *<literal> ili *<simbol>
-                else
-                {
-                    operand.erase(0);
-                    current_section->bytes.add(4 << 5);
-                    ++current_section->location_counter;
+        string operand = operands[i];
+        if (operand == "")
+            continue;
 
-                    word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-                    byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-                    current_section->bytes.add(array, 2);
-                    current_section->location_counter += 2;
-                }
-            }
-            // <literal> ili <simbol>
-            else
-            {
-                current_section->bytes.add(0 << 5);
-                ++current_section->location_counter;
-
-                word number = parseOperand(operand, current_section, &symbolTable);
-                byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-                current_section->bytes.add(array, 2);
-                current_section->location_counter += 2;
-            }
-        }
-        // ()
-        else
-        {
-            string operand = sm[2];
-            if (operand[0] != '*')
-                throw SyntaxError("Invalid syntax: " + operand);
-
-            operand.erase(0, 1);
-
-            // *(%r<num>)
-            if (operand == "")
-            {
-                operand = sm[3];
-                if (operand[0] != '%')
-                {
-                    string tmp = sm[2];
-                    throw SyntaxError("Invalid syntax: " + tmp + operand);
-                }
-
-                regDir(operand.substr(1), 2);
-            }
-            // *<literal>(%r<num>) ili *<simbol>(%r<num>) ili *<simbol>(%pc/%r7)
-            else
-            {
-                operand = sm[3];
-                if (operand[0] != '%')
-                {
-                    string tmp = sm[2];
-                    throw SyntaxError("Invalid syntax: " + tmp + operand);
-                }
-
-                regDir(operand.substr(1), 3);
-
-                operand = sm[2];
-                operand.erase(0, 1);
-
-                word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-                byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-                current_section->bytes.add(array, 2);
-                current_section->location_counter += 2;
-            }
-        }
-
-        return;
-    }
-
-    // not jump instruction
-    if (sm[1] != "")
-    {
-        string operand = sm[1];
-        // $<literal> ili $<simbol>
-        if (operand[0] == '$')
-        {
-            operand.erase(0, 1);
-            current_section->bytes.add(0);
-            ++current_section->location_counter;
-
-            word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-            byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-            current_section->bytes.add(array, 2);
-            current_section->location_counter += 2;
-        }
-        // %r<num>
-        else if (operand[0] == '%')
-        {
-            regDir(operand.substr(1));
-        }
-        // <literal> ili <simbol>
-        else
-        {
-            current_section->bytes.add(4 << 5);
-            ++current_section->location_counter;
-
-            word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-            byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-            current_section->bytes.add(array, 2);
-            current_section->location_counter += 2;
-        }
-    }
-    // ()
-    else
-    {
-        // (%r<num>)
-        if (sm[2] == "")
-        {
-            string operand = sm[3];
-
-            if (operand[0] != '%')
-                throw SyntaxError("Unrecognized symbol: " + operand);
-
-            regDir(operand.substr(1), 2);
-        }
-        // <literal>(%r<num>) ili <simbol>(%r<num>) ili <simbol>(%pc/%r7)
-        else
-        {
-            string operand = sm[3];
-            if (operand[0] != '%')
-            {
-                string tmp = sm[2];
-                throw SyntaxError("Invalid syntax: " + tmp + operand);
-            }
-
-            regDir(operand.substr(1), 3);
-
-            operand = sm[2];
-
-            word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-            byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-            current_section->bytes.add(array, 2);
-            current_section->location_counter += 2;
-        }
-    }
-
-    // 2nd op
-    if (instr->op2 != "")
-    {
         smatch sm;
         const string operand_regex = "(?:([^\\(\\)]+)|([^\\(]*)\\(([^\\)]+)\\))";
-        if (!regex_match(instr->op2, sm, regex(operand_regex)))
+        if (!regex_match(operand, sm, regex(operand_regex)))
             throw SyntaxError("Error - not matched");
 
         if (sm[1] != "")
         {
             string operand = sm[1];
-            // $<literal> ili $<simbol>
-            if (operand[0] == '$')
+            if (instructionDetails->jump && operand[0] == '*')
             {
-                operand.erase(0, 1);
-                current_section->bytes.add(0);
-                ++current_section->location_counter;
-
-                word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-                byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-                current_section->bytes.add(array, 2);
-                current_section->location_counter += 2;
+                if (operand[1] == '%')
+                    regDir(operand.substr(2));
+                else
+                    literalSimbol(operand.substr(1), 4);
             }
-            // %r<num>
-            else if (operand[0] == '%')
-            {
-                regDir(operand.substr(1));
-            }
-            // <literal> ili <simbol>
+            else if (!instructionDetails->jump && operand[0] == '$')
+                literalSimbol(operand.substr(1)); // $<literal> ili $<simbol>
+            else if (!instructionDetails->jump && operand[0] == '%')
+                regDir(operand.substr(1)); // %r<num>
             else
-            {
-                current_section->bytes.add(4 << 5);
-                ++current_section->location_counter;
-
-                word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-                byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-                current_section->bytes.add(array, 2);
-                current_section->location_counter += 2;
-            }
+                literalSimbol(operand, instructionDetails->jump ? 0 : 4); // <literal> ili <simbol>
         }
-        // ()
         else
         {
-            // (%r<num>)
-            if (sm[2] == "")
+            string operand = sm.str(2);
+            if (instructionDetails->jump)
+                if (operand[0] != '*')
+                    throw SyntaxError("Invalid syntax: " + operand);
+                else
+                    operand.erase(0, 1);
+
+            if (operand == "")
             {
-                string operand = sm[3];
+                if (sm.str(3)[0] != '%')
+                    throw SyntaxError("Unrecognized symbol: " + sm.str(3));
 
-                if (operand[0] != '%')
-                    throw SyntaxError("Unrecognized symbol: " + operand);
-
-                regDir(operand.substr(1), 2);
+                regDir(sm.str(3).substr(1), 2); // (%r<num>)
             }
-            // <literal>(%r<num>) ili <simbol>(%r<num>) ili <simbol>(%pc/%r7)
             else
             {
-                string operand = sm[3];
-                if (operand[0] != '%')
-                {
-                    string tmp = sm[2];
-                    throw SyntaxError("Invalid syntax: " + tmp + operand);
-                }
+                if (sm.str(3)[0] != '%')
+                    throw SyntaxError("Invalid syntax: " + sm.str(2) + sm.str(3));
 
-                regDir(operand.substr(1), 3);
-
-                operand = sm[2];
-
-                word number = Assembler::parseOperand(operand, current_section, &symbolTable);
-                byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-                current_section->bytes.add(array, 2);
-                current_section->location_counter += 2;
+                // <literal>(%r<num>) ili <simbol>(%r<num>) ili <simbol>(%pc/%r7)
+                regDir(sm.str(3).substr(1), 3);
+                literalSimbol(operand, -1);
             }
         }
     }
@@ -350,9 +175,7 @@ void Assembler::processDirective(Instruction *instr)
         string name = instr->op1 != "" ? instr->op1.substr(1) : instr->operation;
         Section *ret = sectionTable.addSection(name, current_section);
         if (current_section == ret)
-        {
             symbolTable.insertSymbol('.' + name, true, 0, current_section);
-        }
         else
             current_section = ret;
     }
@@ -364,161 +187,8 @@ void Assembler::processDirective(Instruction *instr)
         current_section = nullptr;
         end = true;
     }
-    else if (instr->operation == "global")
-    {
-        if (instr->op1 == "")
-            throw SyntaxError(".global needs at least 1 operand");
-        symbolTable.setSymbolGlobal(instr->op1);
-
-        string name = "";
-        string ch = "";
-        bool space = false;
-        for (unsigned i = 0; i < instr->op2.length(); ++i)
-        {
-            if (instr->op2[i] == ',' && name != "")
-            {
-                symbolTable.setSymbolGlobal(name);
-                name = "";
-                space = false;
-            }
-            else if (instr->op2[i] == ' ' && name != "")
-            {
-                space = true;
-            }
-            else if (space && instr->op2[i] != ',')
-                throw SyntaxError("Syntax error");
-            else if (instr->op2[i] != ' ')
-            {
-                ch = instr->op2[i];
-                name.append(ch);
-            }
-        }
-        if (name != "")
-            symbolTable.setSymbolGlobal(name);
-    }
-    else if (instr->operation == "extern")
-    {
-        if (instr->op1 == "")
-            throw SyntaxError(".extern needs at least 1 operand");
-        symbolTable.insertExternSymbol(instr->op1);
-
-        string name = "";
-        string ch = "";
-        bool space = false;
-        for (unsigned i = 0; i < instr->op2.length(); ++i)
-        {
-            if (instr->op2[i] == ',' && name != "")
-            {
-                symbolTable.insertExternSymbol(name);
-                name = "";
-                space = false;
-            }
-            else if (instr->op2[i] == ' ' && name != "")
-            {
-                space = true;
-            }
-            else if (space && instr->op2[i] != ',')
-                throw SyntaxError("Syntax error");
-            else if (instr->op2[i] != ' ')
-            {
-                ch = instr->op2[i];
-                name.append(ch);
-            }
-        }
-        if (name != "")
-            symbolTable.insertExternSymbol(name);
-    }
-    else if (instr->operation == "byte")
-    {
-        if (instr->op1 == "")
-            throw SyntaxError(".byte needs at least 1 operand");
-        if (current_section == nullptr)
-            throw SyntaxError("Every command needs to be in a section");
-
-        word number = Assembler::parseOperand(instr->op1, current_section, &symbolTable, true);
-        current_section->bytes.add(number & 0xff);
-        ++current_section->location_counter;
-
-        string name = "";
-        string ch = "";
-        bool space = false;
-        for (unsigned i = 0; i < instr->op2.length(); ++i)
-        {
-            if (instr->op2[i] == ',' && name != "")
-            {
-                number = Assembler::parseOperand(name, current_section, &symbolTable, true);
-                current_section->bytes.add(number & 0xff);
-                ++current_section->location_counter;
-                name = "";
-                space = false;
-            }
-            else if (instr->op2[i] == ' ' && name != "")
-            {
-                space = true;
-            }
-            else if (space && instr->op2[i] != ',')
-                throw SyntaxError("Syntax error");
-            else if (instr->op2[i] != ' ')
-            {
-                ch = instr->op2[i];
-                name.append(ch);
-            }
-        }
-        if (name != "")
-        {
-            number = Assembler::parseOperand(name, current_section, &symbolTable, true);
-            current_section->bytes.add(number & 0xff);
-            ++current_section->location_counter;
-        }
-    }
-    else if (instr->operation == "word")
-    {
-        if (instr->op1 == "")
-            throw SyntaxError(".word needs at least 1 operand");
-        if (current_section == nullptr)
-            throw SyntaxError("Every command needs to be in a section");
-
-        word number = Assembler::parseOperand(instr->op1, current_section, &symbolTable);
-        byte array[] = {(byte)(number & 0xff), (byte)((number >> 8) & 0xff)};
-        current_section->bytes.add(array, 2);
-        current_section->location_counter += 2;
-
-        string name = "";
-        string ch = "";
-        bool space = false;
-        for (unsigned i = 0; i < instr->op2.length(); ++i)
-        {
-            if (instr->op2[i] == ',' && name != "")
-            {
-                number = Assembler::parseOperand(name, current_section, &symbolTable);
-                array[0] = number & 0xff;
-                array[1] = (number >> 8) & 0xff;
-                current_section->bytes.add(array, 2);
-                current_section->location_counter += 2;
-                name = "";
-                space = false;
-            }
-            else if (instr->op2[i] == ' ' && name != "")
-            {
-                space = true;
-            }
-            else if (space && instr->op2[i] != ',')
-                throw SyntaxError("Syntax error");
-            else if (instr->op2[i] != ' ')
-            {
-                ch = instr->op2[i];
-                name.append(ch);
-            }
-        }
-        if (name != "")
-        {
-            number = Assembler::parseOperand(name, current_section, &symbolTable);
-            array[0] = number & 0xff;
-            array[1] = (number >> 8) & 0xff;
-            current_section->bytes.add(array, 2);
-            current_section->location_counter += 2;
-        }
-    }
+    else if (instr->operation == "global" || instr->operation == "extern" || instr->operation == "byte" || instr->operation == "word")
+        directive(instr->operation, instr);
     else if (instr->operation == "skip")
     {
         if (instr->op1 == "" && instr->op2 != "")
@@ -528,16 +198,18 @@ void Assembler::processDirective(Instruction *instr)
         if (number < 0)
             throw SyntaxError("Operand cannot be less than zero.");
 
-        current_section->bytes.skip(number);
-        current_section->location_counter += number;
+        byte *arr = new byte[number];
+        for (unsigned i = 0; i < number; ++i)
+        {
+            current_section->bytes.push_back(arr[i]);
+        }
+        delete arr;
     }
     else if (instr->operation == "equ")
     {
         if (instr->op1 == "" || instr->op2 == "" || regex_match(instr->op1, regex(".*(\\+|-).*")))
             throw SyntaxError();
 
-        const auto &ret = REGISTERS.find(instr->op1);
-        const auto &ret2 = INSTRUCTIONS.find(instr->op1);
         if (Assembler::isLiteral(instr->op1))
             throw SyntaxError();
 
@@ -555,43 +227,12 @@ void Assembler::processLabel(string label)
     if (!current_section)
         throw SyntaxError("Every symbol needs to be in a section");
 
-    SymbolTable::Symbol *symb = symbolTable.getSymbol(label);
-    if (!symb)
-        symbolTable.insertSymbol(label, true, current_section->location_counter, current_section);
-    else
-    {
-        symb->defined = true;
-        symb->section = current_section;
-        symb->value = current_section->location_counter;
-        symb->clearFLink();
-    }
+    symbolTable.insertSymbol(label, true, current_section->bytes.size(), current_section);
 }
 
 bool Assembler::isLiteral(string arg)
 {
-    if (arg == "")
-        return false;
-
-    if (arg[0] == '\'' && arg[arg.length() - 1] == '\'' && (arg[1] != '\\' && arg.length() == 3 || arg[1] == '\\' && arg.length() == 4))
-        return true;
-
-    if (arg[0] == '-')
-        arg.erase(0, 1);
-
-    if (arg.length() > 2 && arg[0] == '0' && (arg[1] == 'x' || arg[1] == 'X'))
-    {
-        for (unsigned i = 2; i < arg.length(); ++i)
-            if (!(arg[i] >= '0' && arg[i] <= '9' || arg[i] >= 'a' && arg[i] <= 'f' || arg[i] >= 'A' && arg[i] <= 'F'))
-                return false;
-
-        return true;
-    }
-
-    for (unsigned i = 0; i < arg.length(); ++i)
-        if (!(arg[i] >= '0' && arg[i] <= '9'))
-            return false;
-
-    return true;
+    return arg != "" && (regex_match(arg, regex("'\\\\?.'")) || regex_match(arg, regex("(?:\\+|-)?[0-9]+")) || regex_match(arg, regex("(?:\\+|-)?(?:0x|0X)[0-9a-fA-F]+")));
 }
 
 word Assembler::parseInt(string arg)
@@ -604,13 +245,13 @@ word Assembler::parseInt(string arg)
 
     word number = 0;
     bool minus = false;
-    if (arg[0] == '-')
+    if (arg[0] == '-' || arg[0] == '+')
     {
-        minus = true;
+        minus = arg[0] == '-';
         arg.erase(0, 1);
     }
 
-    if (arg.length() > 2 && arg[0] == '0' && (arg[1] == 'x' || arg[1] == 'X'))
+    if (regex_match(arg, regex("(?:0x|0X)[0-9a-fA-F]+")))
     {
         for (unsigned i = 2; i < arg.length(); ++i)
         {
@@ -623,49 +264,16 @@ word Assembler::parseInt(string arg)
                 number += arg[i] - 'A' + 10;
         }
     }
-    else
+    else if (regex_match(arg, regex("[0-9]+")))
         for (unsigned i = 0; i < arg.length(); ++i)
         {
             number *= 10;
             number += arg[i] - '0';
         }
+    else
+        throw SyntaxError(arg + "is not a number");
 
     return number * (minus ? -1 : 1);
-}
-
-unsigned Assembler::parseArgs(string args, word *values)
-{
-    if (args == "")
-    {
-        values = nullptr;
-        return 0;
-    }
-
-    unsigned cnt = 0;
-    Array *array = new Array();
-    for (unsigned i = 0; i < args.length(); ++i)
-    {
-        if (args[i] != ',')
-            throw SyntaxError("Syntax error");
-        unsigned comma = i + 1;
-        for (; comma < args.length() && args[comma] != ','; ++comma)
-            ;
-        array->set(cnt, 0);
-        for (; i < comma; ++i)
-        {
-            array->set(cnt, array->get(cnt) * 10);
-            array->set(cnt, array->get(cnt) + args[comma]);
-        }
-        ++cnt;
-    }
-
-    values = new word[array->length()];
-    for (unsigned i = 0; i < array->length(); ++i)
-    {
-        values[i] = array->get(i);
-    }
-    delete array;
-    return cnt;
 }
 
 word Assembler::parseOperand(string operand, Section *section, SymbolTable *symbolTable, bool lowerByteOnly)
@@ -686,7 +294,7 @@ word Assembler::parseOperand(string operand, Section *section, SymbolTable *symb
                 symbolTable->insertSymbol(operand, false);
                 symb = symbolTable->getSymbol(operand);
             }
-            symb->addFLink(section, section->location_counter, lowerByteOnly ? 1 : 2);
+            symb->addFLink(section, section->bytes.size(), lowerByteOnly ? 1 : 2);
         }
     }
 
@@ -702,11 +310,74 @@ void Assembler::regDir(string operand, byte op_code)
     RegisterDetails *r = reg->second;
 
     if (r->size == 1)
-        current_section->bytes.set(current_section->location_counter - 1, current_section->bytes.get(current_section->location_counter - 1) & ~(1 << 2));
-    current_section->bytes.add(op_code << 5 | r->code << 1 | (r->size == 1 && r->high ? 1 : 0));
-    ++current_section->location_counter;
+        current_section->bytes[current_section->bytes.size() - 1] &= ~(1 << 2);
+    current_section->bytes.push_back(op_code << 5 | r->code << 1 | (r->size == 1 && r->high ? 1 : 0));
 }
 
-void literalSimbol(string operand) {
+void Assembler::literalSimbol(string operand, byte op_code)
+{
+    if (op_code != -1)
+        current_section->bytes.push_back(op_code << 5);
 
+    word number = Assembler::parseOperand(operand, current_section, &symbolTable);
+    current_section->bytes.push_back(number & 0xff);
+    current_section->bytes.push_back(number >> 8 & 0xff);
+}
+
+void Assembler::directive(string directive, Instruction *instr)
+{
+    if (instr->op1 == "")
+        throw SyntaxError("." + directive + " needs at least 1 operand");
+
+    if (current_section == nullptr && (directive == "byte" || directive == "word"))
+        throw SyntaxError("." + instr->operation + " needs to be in a section");
+
+    vector<string> elems = Assembler::splitString(instr->op1 + ',' + instr->op2, "(?:,|[^,\\s]+)");
+    unsigned i = 0;
+
+    for (string s : elems)
+    {
+        if (i & 1)
+        {
+            if (s[0] != ',')
+                throw SyntaxError();
+        }
+        else
+        {
+            if (s[0] == ',')
+                throw SyntaxError();
+            else
+            {
+                if (directive == "global")
+                    symbolTable.setSymbolGlobal(s);
+                else if (directive == "extern")
+                    symbolTable.insertExternSymbol(s);
+                else
+                    processWord(s, directive == "byte");
+            }
+        }
+        ++i;
+    }
+}
+
+vector<string> Assembler::splitString(string str, string regex)
+{
+    vector<string> elems;
+    smatch sm;
+
+    while (regex_search(str, sm, std::regex(regex)))
+    {
+        elems.push_back(sm.str());
+        str = sm.suffix().str();
+    }
+
+    return elems;
+}
+
+void Assembler::processWord(string numb, bool byteInstr)
+{
+    word number = Assembler::parseOperand(numb, current_section, &symbolTable, byteInstr);
+    current_section->bytes.push_back(number & 0xff);
+    if (!byteInstr)
+        current_section->bytes.push_back(number >> 8 & 0xff);
 }

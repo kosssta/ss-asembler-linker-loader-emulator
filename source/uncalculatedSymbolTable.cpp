@@ -10,16 +10,13 @@ bool UncalculatedSymbolsTable::Symbol::calculateValue(SymbolTable *symbTable)
 {
     bool ret = true;
     
-    string str = expression;
     string updated_expresion = "";
-    smatch sm;
-    regex r("(?:\\+|-|[^-\\+\\s]+)");
     bool minusSign = false;
     unsigned i = 0;
 
-    while (regex_search(str, sm, r))
+    vector<string> elems = Assembler::splitString(expression, "(?:\\+|-|[^-\\+\\s]+)");
+    for (string s : elems)
     {
-        string s = sm.str(0);
         if (s == "+" || s == "-")
         {
             if ((i & 1) || i++ == 0)
@@ -44,7 +41,6 @@ bool UncalculatedSymbolsTable::Symbol::calculateValue(SymbolTable *symbTable)
         }
 
         ++i;
-        str = sm.suffix().str();
     }
 
     expression = updated_expresion;
@@ -113,10 +109,14 @@ bool UncalculatedSymbolsTable::calculateAll()
     for (Symbol *s : symbols)
     {
         bool calculated = s->calculateValue(symbTable);
-        if (calculated)
-            symbTable->insertSymbol(s->name, true, s->value, s->section);
-        else
-            ret = false;
+        SymbolTable::Symbol *symb = symbTable->getSymbol(s->name);
+        if(symb) {
+            symb->section = s->section;
+            symb->defined = calculated;
+            symb->value = s->value;
+            symb->clearFLink();
+        }
+        ret &= calculated;
     }
 
     return ret;

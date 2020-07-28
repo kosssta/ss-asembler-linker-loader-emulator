@@ -2,6 +2,7 @@
 #define ASSEMBLER_H_
 
 #include <string>
+#include <vector>
 #include "symbolTable.hpp"
 #include "sectionTable.hpp"
 #include "uncalculatedSymbolsTable.hpp"
@@ -22,6 +23,7 @@ public:
     static bool isLiteral(string arg);
     static word parseInt(string arg);
     static word parseOperand(string operand, Section *section, SymbolTable *SymbolTable, bool lowerByteOnly = false);
+    static vector<string> splitString(string str, string regex);
 
 private:
     SymbolTable symbolTable;
@@ -33,9 +35,10 @@ private:
     void processDirective(Instruction *instr);
     void processCommand(Instruction *instr);
     void processLabel(string label);
-    unsigned parseArgs(string args, word *values);
     void regDir(string operand, byte op_code = 1);
-    void literalSimbol(string operand);
+    void literalSimbol(string operand, byte op_code = 0);
+    void directive(string directive, Instruction *instr);
+    void processWord(string numb, bool byteInstr = false);
 };
 
 #endif

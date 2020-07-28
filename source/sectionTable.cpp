@@ -35,15 +35,15 @@ void SectionTable::write() const
         Section *curr = s.second;
 
         cout << '.' << s.first << ':' << endl; 
-        cout << "Length = " << curr->bytes.length() << endl;
-        for (unsigned i = 0; i < curr->bytes.length(); ++i)
+        cout << "Length = " << curr->bytes.size() << endl;
+        for (byte b : curr->bytes)
         {
-            byte tmp = (curr->bytes.get(i) >> 4) & 0x0f;
+            byte tmp = (b >> 4) & 0x0f;
             if (tmp < 10)
                 cout << (char)('0' + tmp);
             else
                 cout << (char)('A' - 10 + tmp);
-            tmp = curr->bytes.get(i) & 0x0f;
+            tmp = b & 0x0f;
             if (tmp < 10)
                 cout << (char)('0' + tmp) << ' ';
             else

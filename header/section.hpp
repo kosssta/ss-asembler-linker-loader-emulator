@@ -2,14 +2,13 @@
 #define SECTION_H_
 
 #include <string>
-#include "array.hpp"
+#include <vector>
 using namespace std;
 
 typedef int8_t byte;
 
 struct Section {
-    Array bytes;
-    unsigned location_counter = 0;
+    vector<byte> bytes;
     char access_rights = 0;
 };
 

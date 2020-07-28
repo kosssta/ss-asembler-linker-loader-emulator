@@ -2,7 +2,7 @@
 #include "symbolAlreadyDefinedError.hpp"
 #include "section.hpp"
 
-unsigned SymbolTable::insertSymbol(string name, bool defined, long value, Section *section)
+unsigned SymbolTable::insertSymbol(string name, bool defined, word value, Section *section)
 {
     Symbol *symb = getSymbol(name);
     if (!symb)
@@ -60,40 +60,43 @@ void SymbolTable::setSymbolGlobal(string name)
 void SymbolTable::Symbol::clearFLink()
 {
     while (flink)
-    {
-        if (flink->size == 1)
-            flink->section->bytes.set(flink->location, (byte)value);
-        else
+    { 
+        word tmp = value;
+        for (unsigned i = 0; i < flink->size; ++i)
         {
-            byte *array = new byte[flink->size];
-            long tmp = value;
-            for (unsigned i = 0; i < flink->size; ++i)
-            {
-                array[i] = tmp & 0xff;
-                tmp >>= 8;
-            }
-            flink->section->bytes.set(flink->location, array, flink->size);
-            delete array;
+            flink->section->bytes[flink->location + i] = tmp & 0xff;
+            tmp >>= 8;
         }
         flink = flink->next;
     }
 }
 
-void SymbolTable::write() const {
+void SymbolTable::write() const
+{
     cout << "Symbol table" << endl;
-    cout << "Name\t" << "Value\t" << "Section\t" << "Defined\t" << "Global\t" << "Id\t" << endl;
-    for(auto& symb: symbols) {
+    cout << "Name\t"
+         << "Value\t"
+         << "Section\t"
+         << "Defined\t"
+         << "Global\t"
+         << "Id\t" << endl;
+    for (auto &symb : symbols)
+    {
         Symbol *s = symb.second;
         cout << s->name << '\t' << s->value << '\t' << ((long)s->section & 0xffff) << '\t' << (s->defined ? "true" : "false") << '\t'
-        << (s->global ? "true" : "false") << '\t' << s->id << endl;
+             << (s->global ? "true" : "false") << '\t' << s->id << endl;
     }
-    cout << endl << "Extern symbols:\n";
-    for(auto &symb: externSymbols) {
+    cout << endl
+         << "Extern symbols:\n";
+    for (auto &symb : externSymbols)
+    {
         cout << symb.second << endl;
     }
-    if(externSymbols.empty()) cout << "No extern symbols" << endl;
+    if (externSymbols.empty())
+        cout << "No extern symbols" << endl;
 }
 
-void SymbolTable::insertExternSymbol(string name) {
+void SymbolTable::insertExternSymbol(string name)
+{
     externSymbols[name] = name;
 }
