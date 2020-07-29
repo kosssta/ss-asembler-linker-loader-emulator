@@ -18,7 +18,7 @@ struct Section;
 class Assembler
 {
 public:
-    Assembler() : uncalculatedSymbols(&symbolTable) {}
+    Assembler() : uncalculatedSymbols(&symbolTable, &relocationTable), relocationTable(&symbolTable) {}
 
     void assembly(string input_file, string output_file);
     static bool isLiteral(string arg);
@@ -33,6 +33,7 @@ private:
     RelocationTable relocationTable;
     Section *current_section = nullptr;
     bool end = false;
+    unsigned num_errors = 0;
 
     void processDirective(Instruction *instr);
     void processCommand(Instruction *instr);

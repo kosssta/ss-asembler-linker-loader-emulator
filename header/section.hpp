@@ -8,6 +8,7 @@ using namespace std;
 typedef int8_t byte;
 
 struct Section {
+    string name;
     vector<byte> bytes;
     char access_rights = 0;
 };

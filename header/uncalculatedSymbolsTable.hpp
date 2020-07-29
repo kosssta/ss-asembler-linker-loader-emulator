@@ -3,13 +3,15 @@
 
 #include <string>
 #include <cstdint>
-#include <vector>
-#include "symbolTable.hpp"
+#include <unordered_map>
+#include <forward_list>
 using namespace std;
 
 typedef int16_t word;
 
 struct Section;
+class SymbolTable;
+class RelocationTable;
 
 class UncalculatedSymbolsTable
 {
@@ -18,22 +20,24 @@ public:
     {
         string name;
         string expression;
-        Section *section;
         word value;
+        forward_list<string> symbols;
 
-        Symbol(string name, string expression, Section *section) : name(name), expression(expression), section(section), value(0) {}
-        bool calculateValue(SymbolTable *symbTable);
-        word parseOperand(string operand, SymbolTable *symbTable, bool *status = nullptr);
+        Symbol(string name, string expression);
+        bool calculateValue(SymbolTable *symbTable, RelocationTable *relTable);
+        word parseOperand(string operand, SymbolTable *symbTable, RelocationTable *relTable, bool minusSign, bool *status = nullptr);
     };
 
-    UncalculatedSymbolsTable(SymbolTable *symbTable) : symbTable(symbTable) {}
-    void add(string name, string expression, Section *section);
+    UncalculatedSymbolsTable(SymbolTable *symbTable, RelocationTable *relTable) : symbTable(symbTable), relTable(relTable) {}
+    void add(string name, string expression);
+    Symbol *get(string name);
     void write() const;
     bool calculateAll();
 
 private:
     SymbolTable *symbTable;
-    vector<Symbol*> symbols;
+    RelocationTable *relTable;
+    unordered_map<string, UncalculatedSymbolsTable::Symbol*> symbols;
 };
 
 #endif

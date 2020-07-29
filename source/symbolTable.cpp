@@ -26,9 +26,10 @@ unsigned SymbolTable::insertSymbol(string name, bool defined, word value, Sectio
     {
         symb->defined = defined;
         symb->value = value;
-        if (defined)
+        if (defined) {
             symb->section = section;
-        symb->clearFLink();
+            symb->clearFLink();
+        }
     }
     return 0;
 }
@@ -36,9 +37,7 @@ unsigned SymbolTable::insertSymbol(string name, bool defined, word value, Sectio
 SymbolTable::Symbol *SymbolTable::getSymbol(string name)
 {
     unordered_map<string, Symbol *>::iterator ret = symbols.find(name);
-    if (ret == symbols.end())
-        return nullptr;
-    return ret->second;
+    return ret == symbols.end() ? nullptr : ret->second;
 }
 
 void SymbolTable::setSymbolGlobal(string name)

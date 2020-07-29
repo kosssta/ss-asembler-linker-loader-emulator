@@ -15,9 +15,9 @@ void Assembler::assembly(string input_file, string output_file)
     string line = "";
     unsigned line_number = 1;
 
-    while (!end && getline(input, line))
+    try
     {
-        try
+        while (!end && getline(input, line))
         {
             Instruction *instr = LineParser::parse(line);
 
@@ -32,24 +32,25 @@ void Assembler::assembly(string input_file, string output_file)
             delete instr;
             ++line_number;
         }
-        catch (SyntaxError err)
-        {
-            err.setLineNumber(line_number++);
-            cerr << err.getErrorMessage() << endl;
-        }
-    }
 
-    input.close();
+        input.close();
 
-    try
-    {
-        if (!uncalculatedSymbols.calculateAll())
-            throw SyntaxError("Uncalculated symbols");
+        uncalculatedSymbols.calculateAll();
     }
     catch (SyntaxError err)
     {
+        err.setLineNumber(line_number++);
         cerr << err.getErrorMessage() << endl;
+        ++num_errors;
     }
+
+    if (num_errors > 0)
+    {
+        cout << "Errors: " << num_errors << endl;
+        return;
+    }
+
+    relocationTable.replace();
 
     symbolTable.write();
     cout << endl;
@@ -176,6 +177,7 @@ void Assembler::processDirective(Instruction *instr)
 
         current_section = new Section();
         string name = instr->op1 != "" ? instr->op1.substr(1) : instr->operation;
+        current_section->name = '.' + name;
         Section *ret = sectionTable.addSection(name, current_section);
         if (current_section == ret)
             symbolTable.insertSymbol('.' + name, true, 0, current_section);
@@ -198,7 +200,7 @@ void Assembler::processDirective(Instruction *instr)
         if (current_section == nullptr && (instr->operation == "byte" || instr->operation == "word"))
             throw SyntaxError("." + instr->operation + " needs to be in a section");
 
-        vector<string> elems = Assembler::splitString(instr->op1 + ',' + instr->op2, "(?:,|[^,\\s]+)");
+        vector<string> elems = Assembler::splitString(instr->op2 == "" ? instr->op1 : instr->op1 + ',' + instr->op2, "(?:,|[^,\\s]+)");
         unsigned i = 0;
 
         for (string s : elems)
@@ -222,7 +224,7 @@ void Assembler::processDirective(Instruction *instr)
                     {
                         word number = Assembler::parseOperand(s, current_section, &symbolTable, instr->operation == "byte");
                         if (!isLiteral(s))
-                            relocationTable.add(current_section, current_section->bytes.size(), instr->operation == "byte" ? RelocationTable::R_X86_64_8 : RelocationTable::R_X86_64_16);
+                            relocationTable.add(s, current_section, current_section->bytes.size(), instr->operation == "byte" ? RelocationTable::R_X86_64_8 : RelocationTable::R_X86_64_16);
                         current_section->bytes.push_back(number & 0xff);
                         if (instr->operation == "word")
                             current_section->bytes.push_back(number >> 8 & 0xff);
@@ -231,6 +233,9 @@ void Assembler::processDirective(Instruction *instr)
             }
             ++i;
         }
+
+        if (!(i & 1))
+            throw SyntaxError();
     }
     else if (instr->operation == "skip")
     {
@@ -256,7 +261,7 @@ void Assembler::processDirective(Instruction *instr)
         if (Assembler::isLiteral(instr->op1))
             throw SyntaxError();
 
-        uncalculatedSymbols.add(instr->op1, instr->op2, current_section);
+        uncalculatedSymbols.add(instr->op1, instr->op2);
     }
     else
         throw SyntaxError("Unrecognized directive: ." + instr->operation);
@@ -337,6 +342,7 @@ word Assembler::parseOperand(string operand, Section *section, SymbolTable *symb
                 symbolTable->insertSymbol(operand, false);
                 symb = symbolTable->getSymbol(operand);
             }
+
             symb->addFLink(section, section->bytes.size(), lowerByteOnly ? 1 : 2);
         }
     }
@@ -364,7 +370,12 @@ void Assembler::literalSimbol(string operand, byte op_code, bool pc_rel)
 
     word number = Assembler::parseOperand(operand, current_section, &symbolTable);
     if (!Assembler::isLiteral(operand))
-        relocationTable.add(current_section, current_section->bytes.size(), pc_rel ? RelocationTable::R_X86_64_PC16 : RelocationTable::R_X86_64_16);
+        relocationTable.add(operand, current_section, current_section->bytes.size(), pc_rel ? RelocationTable::R_X86_64_PC16 : RelocationTable::R_X86_64_16);
+
+    SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
+    if (symb && !symb->defined)
+        symb->addFLink(current_section, current_section->bytes.size(), 2);
+
     current_section->bytes.push_back(number & 0xff);
     current_section->bytes.push_back(number >> 8 & 0xff);
 }
