@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <forward_list>
+#include <list>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -39,6 +40,7 @@ public:
             flink.push_front(FLink(section, location, size));
         }
         void clearFLink();
+        friend bool operator<(const Symbol &s1, const Symbol &s2);
     };
 
     ~SymbolTable();
@@ -49,6 +51,7 @@ public:
     
     Symbol* getSymbol(string name) const;
     Symbol *getExternSymbol(string name) const;
+    list<Symbol> sort() const;
     void write(ofstream& output) const;
 
 private:

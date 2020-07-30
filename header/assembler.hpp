@@ -39,7 +39,7 @@ private:
     void processCommand(Instruction *instr);
     void processLabel(string label);
     unsigned processRegister(string operand, byte op_code = 1);
-    void processLiteralOrSymbol(string operand, byte op_code = 0, bool pc_rel = false);
+    void processLiteralOrSymbol(string operand, unsigned size, byte op_code = 0, bool pc_rel = false);
 };
 
 #endif

@@ -135,14 +135,19 @@ void Assembler::processCommand(Instruction *instr)
                 if (operand[1] == '%')
                     processRegister(operand.substr(2));
                 else
-                    processLiteralOrSymbol(operand.substr(1), 4);
+                    processLiteralOrSymbol(operand.substr(1), 2, 4);
             }
             else if (!instructionDetails.jump && operand[0] == '$')
-                processLiteralOrSymbol(operand.substr(1)); // $<literal> ili $<simbol>
+            {
+                if (instructionDetails.num_operands == 1 && instructionDetails.operation_code != 9 || instructionDetails.num_operands == 2 && (instructionDetails.operation_code == 24 && i == 0 || instructionDetails.operation_code != 24 && i == 1))
+                    throw SyntaxError("Immediate addressing is not allowed for the destination operand");
+
+                processLiteralOrSymbol(operand.substr(1), 2); // $<literal> ili $<simbol>
+            }
             else if (!instructionDetails.jump && operand[0] == '%')
                 processRegister(operand.substr(1)); // %r<num>
             else
-                processLiteralOrSymbol(operand, instructionDetails.jump ? 0 : 4); // <literal> ili <simbol>
+                processLiteralOrSymbol(operand, 2, instructionDetails.jump ? 0 : 4); // <literal> ili <simbol>
         }
         else
         {
@@ -167,8 +172,8 @@ void Assembler::processCommand(Instruction *instr)
 
                 // <literal>(%r<num>) ili <simbol>(%r<num>) ili <simbol>(%pc/%r7)
                 string reg = sm.str(3).substr(1);
-                processRegister(reg, 3);
-                processLiteralOrSymbol(operand, -1, reg == "pc" || reg == "r7");
+                unsigned size = processRegister(reg, 3);
+                processLiteralOrSymbol(operand, size, -1, reg == "pc" || reg == "r7");
             }
         }
     }
@@ -191,7 +196,6 @@ void Assembler::processDirective(Instruction *instr)
         {
             unsigned id = symbolTable.insertSymbol('.' + name, true, 0, current_section);
             current_section->id = id;
-            symbolTable.setSymbolGlobal('.' + name);
         }
         else
             current_section = ret;
@@ -371,31 +375,35 @@ unsigned Assembler::processRegister(string operand, byte op_code)
     const RegisterDetails &r = reg->second;
 
     if (r.size == 1)
-        current_section->bytes[current_section->bytes.size() - 1] &= ~(1 << 2);
+        current_section->bytes[current_section->bytes.size() - 1] &= ~0x4;
     current_section->bytes.push_back(op_code << 5 | r.code << 1 | (r.size == 1 && r.high ? 1 : 0));
     return r.size;
 }
 
-void Assembler::processLiteralOrSymbol(string operand, byte op_code, bool pc_rel)
+void Assembler::processLiteralOrSymbol(string operand, unsigned size, byte op_code, bool pc_rel)
 {
     if (op_code != -1)
         current_section->bytes.push_back(op_code << 5);
 
+    if (size == 1)
+        current_section->bytes[current_section->bytes.size() - 2] &= ~0x4;
+
     word number = Assembler::parseOperand(operand, current_section, &symbolTable);
     if (!Assembler::isLiteral(operand))
-        relocationTable.add(operand, current_section, current_section->bytes.size(), pc_rel ? RelocationTable::R_X86_64_PC16 : RelocationTable::R_X86_64_16);
+        relocationTable.add(operand, current_section, current_section->bytes.size(), pc_rel ? RelocationTable::R_X86_64_PC16 : (size == 2 ? RelocationTable::R_X86_64_16 : RelocationTable::R_X86_64_8));
     else if (pc_rel)
         throw SyntaxError("Literals not allowed with pc relative addressing");
 
     SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
     if (symb && !symb->defined)
-        symb->addFLink(current_section, current_section->bytes.size(), 2);
+        symb->addFLink(current_section, current_section->bytes.size(), size);
 
     if (pc_rel)
         number -= 4;
 
     current_section->bytes.push_back(number & 0xff);
-    current_section->bytes.push_back(number >> 8 & 0xff);
+    if (size == 2)
+        current_section->bytes.push_back(number >> 8 & 0xff);
 }
 
 list<string> Assembler::splitString(string str, string regex)
