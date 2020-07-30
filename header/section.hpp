@@ -9,8 +9,11 @@ typedef int8_t byte;
 
 struct Section {
     string name;
+    unsigned id;
     vector<byte> bytes;
     char access_rights = 0;
+
+    Section(string name, unsigned id = 0) : name(name), id(id) {}
 };
 
 #endif

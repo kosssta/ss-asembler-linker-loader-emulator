@@ -1,5 +1,5 @@
-#ifndef LINEPARSER_H_
-#define LINEPARSER_H_
+#ifndef LINE_PARSER_H_
+#define LINE_PARSER_H_
 
 #include <string>
 using namespace std;

@@ -1,9 +1,12 @@
-#ifndef SYMBOLTABLE_H_
-#define SYMBOLTABLE_H_
+#ifndef SYMBOL_TABLE_H_
+#define SYMBOL_TABLE_H_
 
 #include <string>
 #include <unordered_map>
+#include <forward_list>
 #include <cstdint>
+#include <fstream>
+#include <iostream>
 using namespace std;
 
 struct Section;
@@ -18,9 +21,8 @@ public:
         Section *section;
         unsigned location;
         char size;
-        FLink *next;
 
-        FLink(Section *section, unsigned location, char size, FLink *next = nullptr) : section(section), location(location), size(size), next(next) {}
+        FLink(Section *section, unsigned location, char size) : section(section), location(location), size(size) {}
     };
 
     struct Symbol
@@ -31,20 +33,23 @@ public:
         bool defined;
         bool global;
         unsigned id;
-        FLink *flink = nullptr;
-        Symbol *next = nullptr;
+        forward_list<FLink> flink;
 
         void addFLink(Section *section, unsigned location, char size) {
-            flink = new FLink(section, location, size, flink);
+            flink.push_front(FLink(section, location, size));
         }
         void clearFLink();
     };
 
+    ~SymbolTable();
     unsigned insertSymbol(string name, bool defined, word value = 0, Section *section = nullptr);
-    Symbol* getSymbol(string name);
-    void setSymbolGlobal(string name);
-    void write() const;
     void insertExternSymbol(string name);
+    void setSymbolGlobal(string name);
+    void removeAllLocalSymbols();
+    
+    Symbol* getSymbol(string name) const;
+    Symbol *getExternSymbol(string name) const;
+    void write(ofstream& output) const;
 
 private:
     unordered_map<string, Symbol*> symbols;

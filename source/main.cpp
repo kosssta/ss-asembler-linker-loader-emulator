@@ -4,25 +4,45 @@
 #include "assembler.hpp"
 using namespace std;
 
-int main(int argc, char *argv[]) {
-    if (argc < 2 || argc > 4) {
-        cout << "Greska: Potrebno je proslediti tacno 1 ulazni fajl" << endl;
-        return 0;
+int main(int argc, char *argv[])
+{
+    const string error_message = "Error: Usage -> asembler [-o output_file_name] input_file_name";
+
+    if (argc != 2 && argc != 4)
+    {
+        cerr << error_message << endl;
+        return -1;
     }
 
-    string output_file = "a.out";
+    string output_file = "a.o";
     string input_file = "";
 
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "-o") == 0) {
-            if (i + 1 < argc)
-                output_file = argv[++i];
-            else {
-                cout << "Greska u sintaksi" << endl;
-                return 0;
-            }
-        } else {
-            input_file = argv[i];
+    if (argc == 2)
+    {
+        if (strcmp(argv[1], "-o") == 0)
+        {
+            cerr << error_message << endl;
+            return -1;
+        }
+        else
+            input_file = argv[1];
+    }
+    else
+    {
+        if (strcmp(argv[1], "-o") == 0 && strcmp(argv[2], "-o") != 0 && strcmp(argv[3], "-o") != 0)
+        {
+            output_file = argv[2];
+            input_file = argv[3];
+        }
+        else if (strcmp(argv[1], "-o") != 0 && strcmp(argv[2], "-o") == 0 && strcmp(argv[3], "-o") != 0)
+        {
+            output_file = argv[3];
+            input_file = argv[1];
+        }
+        else
+        {
+            cerr << error_message << endl;
+            return -1;
         }
     }
 

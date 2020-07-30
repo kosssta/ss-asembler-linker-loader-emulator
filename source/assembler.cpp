@@ -1,11 +1,10 @@
 #include "assembler.hpp"
-#include <iostream>
-#include <fstream>
-#include <string>
 #include "instruction.hpp"
 #include "lineParser.hpp"
-#include "syntaxError.hpp"
+#include "syntaxErrors.hpp"
 #include "section.hpp"
+#include <iostream>
+#include <fstream>
 #include <regex>
 using namespace std;
 
@@ -15,9 +14,9 @@ void Assembler::assembly(string input_file, string output_file)
     string line = "";
     unsigned line_number = 1;
 
-    try
+    while (!end && getline(input, line))
     {
-        while (!end && getline(input, line))
+        try
         {
             Instruction *instr = LineParser::parse(line);
 
@@ -33,13 +32,24 @@ void Assembler::assembly(string input_file, string output_file)
             ++line_number;
         }
 
-        input.close();
+        catch (SyntaxError err)
+        {
+            err.setLineNumber(line_number++);
+            cerr << err.getErrorMessage() << endl;
+            ++num_errors;
+        }
+    }
 
+    input.close();
+
+    try
+    {
         uncalculatedSymbols.calculateAll();
+        relocationTable.replace();
+        symbolTable.removeAllLocalSymbols();
     }
     catch (SyntaxError err)
     {
-        err.setLineNumber(line_number++);
         cerr << err.getErrorMessage() << endl;
         ++num_errors;
     }
@@ -50,16 +60,15 @@ void Assembler::assembly(string input_file, string output_file)
         return;
     }
 
-    relocationTable.replace();
+    ofstream text_output("../test/" + output_file + ".txt");
 
-    symbolTable.write();
-    cout << endl;
-    uncalculatedSymbols.write();
-    cout << endl;
-    sectionTable.write();
-    cout << endl;
-    relocationTable.write();
-    cout << endl;
+    symbolTable.write(text_output);
+    text_output << endl;
+    sectionTable.write(text_output);
+    relocationTable.write(text_output);
+    text_output << endl;
+
+    text_output.close();
 }
 
 void Assembler::processCommand(Instruction *instr)
@@ -71,35 +80,35 @@ void Assembler::processCommand(Instruction *instr)
 
     const auto &name = INSTRUCTIONS.find(instr->operation);
     if (name == INSTRUCTIONS.end())
-        throw SyntaxError("Unrecognized token " + instr->operation);
+        throw UnrecognizedSymbol(instr->operation);
 
-    InstructionDetails *instructionDetails = name->second;
+    const InstructionDetails &instructionDetails = name->second;
 
-    byte op_code = instructionDetails->operation_code << 3;
+    byte op_code = instructionDetails.operation_code << 3;
 
-    if (instructionDetails->num_operands == 0)
+    if (instructionDetails.num_operands == 0)
     {
         if (instr->op1 != "" || instr->op2 != "")
-            throw SyntaxError("Error: Instruction should have zero arguments.");
+            throw SyntaxError(instr->operation + " has zero arguments");
 
         current_section->bytes.push_back(op_code);
         return;
     }
 
-    if (instructionDetails->num_operands == 1)
+    if (instructionDetails.num_operands == 1)
     {
         if (instr->op1 == "" || instr->op2 != "")
-            throw SyntaxError("Instruction needs 1 argument");
+            throw SyntaxError(instr->operation + " has 1 argument");
     }
     else
     {
         if (instr->op1 == "" || instr->op2 == "")
-            throw SyntaxError("Instruction needs 2 arguments");
+            throw SyntaxError(instr->operation + " has 2 arguments");
     }
 
-    if (instructionDetails->operand_size == 2)
+    if (instructionDetails.operand_size == 2)
         op_code |= 1 << 2;
-    else if (instructionDetails->operand_size == -1)
+    else if (instructionDetails.operand_size == -1)
     {
         op_code |= 1 << 2;
     }
@@ -107,7 +116,7 @@ void Assembler::processCommand(Instruction *instr)
     current_section->bytes.push_back(op_code);
 
     string operands[2] = {instr->op1, instr->op2};
-    for (unsigned i = 0; i < instructionDetails->num_operands; ++i)
+    for (unsigned i = 0; i < instructionDetails.num_operands; ++i)
     {
         string operand = operands[i];
         if (operand == "")
@@ -116,29 +125,29 @@ void Assembler::processCommand(Instruction *instr)
         smatch sm;
         const string operand_regex = "(?:([^\\(\\)]+)|([^\\(]*)\\(([^\\)]+)\\))";
         if (!regex_match(operand, sm, regex(operand_regex)))
-            throw SyntaxError("Error - not matched");
+            throw SyntaxError("Bad format for operand(s)");
 
         if (sm[1] != "")
         {
             string operand = sm[1];
-            if (instructionDetails->jump && operand[0] == '*')
+            if (instructionDetails.jump && operand[0] == '*')
             {
                 if (operand[1] == '%')
-                    regDir(operand.substr(2));
+                    processRegister(operand.substr(2));
                 else
-                    literalSimbol(operand.substr(1), 4);
+                    processLiteralOrSymbol(operand.substr(1), 4);
             }
-            else if (!instructionDetails->jump && operand[0] == '$')
-                literalSimbol(operand.substr(1)); // $<literal> ili $<simbol>
-            else if (!instructionDetails->jump && operand[0] == '%')
-                regDir(operand.substr(1)); // %r<num>
+            else if (!instructionDetails.jump && operand[0] == '$')
+                processLiteralOrSymbol(operand.substr(1)); // $<literal> ili $<simbol>
+            else if (!instructionDetails.jump && operand[0] == '%')
+                processRegister(operand.substr(1)); // %r<num>
             else
-                literalSimbol(operand, instructionDetails->jump ? 0 : 4); // <literal> ili <simbol>
+                processLiteralOrSymbol(operand, instructionDetails.jump ? 0 : 4); // <literal> ili <simbol>
         }
         else
         {
             string operand = sm.str(2);
-            if (instructionDetails->jump)
+            if (instructionDetails.jump)
                 if (operand[0] != '*')
                     throw SyntaxError("Invalid syntax: " + operand);
                 else
@@ -147,9 +156,9 @@ void Assembler::processCommand(Instruction *instr)
             if (operand == "")
             {
                 if (sm.str(3)[0] != '%')
-                    throw SyntaxError("Unrecognized symbol: " + sm.str(3));
+                    throw UnrecognizedSymbol(sm.str(3));
 
-                regDir(sm.str(3).substr(1), 2); // (%r<num>)
+                processRegister(sm.str(3).substr(1), 2); // (%r<num>)
             }
             else
             {
@@ -158,8 +167,8 @@ void Assembler::processCommand(Instruction *instr)
 
                 // <literal>(%r<num>) ili <simbol>(%r<num>) ili <simbol>(%pc/%r7)
                 string reg = sm.str(3).substr(1);
-                regDir(reg, 3);
-                literalSimbol(operand, -1, reg == "pc" || reg == "r7");
+                processRegister(reg, 3);
+                processLiteralOrSymbol(operand, -1, reg == "pc" || reg == "r7");
             }
         }
     }
@@ -173,21 +182,24 @@ void Assembler::processDirective(Instruction *instr)
     if (instr->operation == "section" || instr->operation == "text" || instr->operation == "data" || instr->operation == "bss" || instr->operation == "rodata")
     {
         if (instr->op2 != "" || instr->operation != "section" && instr->op1 != "")
-            throw SyntaxError("Syntax error");
+            throw SyntaxError();
 
-        current_section = new Section();
         string name = instr->op1 != "" ? instr->op1.substr(1) : instr->operation;
-        current_section->name = '.' + name;
+        current_section = new Section("." + name);
         Section *ret = sectionTable.addSection(name, current_section);
         if (current_section == ret)
-            symbolTable.insertSymbol('.' + name, true, 0, current_section);
+        {
+            unsigned id = symbolTable.insertSymbol('.' + name, true, 0, current_section);
+            current_section->id = id;
+            symbolTable.setSymbolGlobal('.' + name);
+        }
         else
             current_section = ret;
     }
     else if (instr->operation == "end")
     {
         if (instr->op1 != "" || instr->op2 != "")
-            throw SyntaxError("Syntax error");
+            throw SyntaxError();
 
         current_section = nullptr;
         end = true;
@@ -200,7 +212,7 @@ void Assembler::processDirective(Instruction *instr)
         if (current_section == nullptr && (instr->operation == "byte" || instr->operation == "word"))
             throw SyntaxError("." + instr->operation + " needs to be in a section");
 
-        vector<string> elems = Assembler::splitString(instr->op2 == "" ? instr->op1 : instr->op1 + ',' + instr->op2, "(?:,|[^,\\s]+)");
+        list<string> elems = Assembler::splitString(instr->op2 == "" ? instr->op1 : instr->op1 + ',' + instr->op2, "(?:,|[^,\\s]+)");
         unsigned i = 0;
 
         for (string s : elems)
@@ -240,11 +252,11 @@ void Assembler::processDirective(Instruction *instr)
     else if (instr->operation == "skip")
     {
         if (instr->op1 == "" && instr->op2 != "")
-            throw SyntaxError(".skip needs exactly 1 argument");
+            throw SyntaxError(".skip needs exactly 1 operand");
 
         word number = Assembler::parseOperand(instr->op1, current_section, &symbolTable);
         if (number < 0)
-            throw SyntaxError("Operand cannot be less than zero.");
+            throw SyntaxError("Operand cannot be negative");
 
         byte *arr = new byte[number];
         for (unsigned i = 0; i < number; ++i)
@@ -261,10 +273,10 @@ void Assembler::processDirective(Instruction *instr)
         if (Assembler::isLiteral(instr->op1))
             throw SyntaxError();
 
-        uncalculatedSymbols.add(instr->op1, instr->op2);
+        uncalculatedSymbols.add(instr->op1, instr->op2, current_section);
     }
     else
-        throw SyntaxError("Unrecognized directive: ." + instr->operation);
+        throw UnrecognizedSymbol(instr->operation);
 }
 
 void Assembler::processLabel(string label)
@@ -319,7 +331,7 @@ word Assembler::parseInt(string arg)
             number += arg[i] - '0';
         }
     else
-        throw SyntaxError(arg + "is not a number");
+        throw SyntaxError("Not a number: " + arg);
 
     return number * (minus ? -1 : 1);
 }
@@ -350,20 +362,21 @@ word Assembler::parseOperand(string operand, Section *section, SymbolTable *symb
     return number;
 }
 
-void Assembler::regDir(string operand, byte op_code)
+unsigned Assembler::processRegister(string operand, byte op_code)
 {
-    unordered_map<string, RegisterDetails *>::const_iterator reg = REGISTERS.find(operand);
+    auto reg = REGISTERS.find(operand);
     if (reg == REGISTERS.end())
-        throw SyntaxError("Unrecognized token: " + operand);
+        throw UnrecognizedSymbol(operand);
 
-    RegisterDetails *r = reg->second;
+    const RegisterDetails &r = reg->second;
 
-    if (r->size == 1)
+    if (r.size == 1)
         current_section->bytes[current_section->bytes.size() - 1] &= ~(1 << 2);
-    current_section->bytes.push_back(op_code << 5 | r->code << 1 | (r->size == 1 && r->high ? 1 : 0));
+    current_section->bytes.push_back(op_code << 5 | r.code << 1 | (r.size == 1 && r.high ? 1 : 0));
+    return r.size;
 }
 
-void Assembler::literalSimbol(string operand, byte op_code, bool pc_rel)
+void Assembler::processLiteralOrSymbol(string operand, byte op_code, bool pc_rel)
 {
     if (op_code != -1)
         current_section->bytes.push_back(op_code << 5);
@@ -371,18 +384,23 @@ void Assembler::literalSimbol(string operand, byte op_code, bool pc_rel)
     word number = Assembler::parseOperand(operand, current_section, &symbolTable);
     if (!Assembler::isLiteral(operand))
         relocationTable.add(operand, current_section, current_section->bytes.size(), pc_rel ? RelocationTable::R_X86_64_PC16 : RelocationTable::R_X86_64_16);
+    else if (pc_rel)
+        throw SyntaxError("Literals not allowed with pc relative addressing");
 
     SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
     if (symb && !symb->defined)
         symb->addFLink(current_section, current_section->bytes.size(), 2);
 
+    if (pc_rel)
+        number -= 4;
+
     current_section->bytes.push_back(number & 0xff);
     current_section->bytes.push_back(number >> 8 & 0xff);
 }
 
-vector<string> Assembler::splitString(string str, string regex)
+list<string> Assembler::splitString(string str, string regex)
 {
-    vector<string> elems;
+    list<string> elems;
     smatch sm;
 
     while (regex_search(str, sm, std::regex(regex)))

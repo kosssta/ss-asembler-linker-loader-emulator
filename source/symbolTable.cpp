@@ -1,6 +1,8 @@
 #include "symbolTable.hpp"
-#include "symbolAlreadyDefinedError.hpp"
 #include "section.hpp"
+#include "syntaxErrors.hpp"
+#include <iomanip>
+using namespace std;
 
 unsigned SymbolTable::insertSymbol(string name, bool defined, word value, Section *section)
 {
@@ -20,13 +22,14 @@ unsigned SymbolTable::insertSymbol(string name, bool defined, word value, Sectio
     }
     else if (symb->defined)
     {
-        throw SymbolAlreadyDefinedError(symb->name);
+        throw SymbolRedefinitionError(symb->name);
     }
     else
     {
         symb->defined = defined;
         symb->value = value;
-        if (defined) {
+        if (defined)
+        {
             symb->section = section;
             symb->clearFLink();
         }
@@ -34,9 +37,9 @@ unsigned SymbolTable::insertSymbol(string name, bool defined, word value, Sectio
     return 0;
 }
 
-SymbolTable::Symbol *SymbolTable::getSymbol(string name)
+SymbolTable::Symbol *SymbolTable::getSymbol(string name) const
 {
-    unordered_map<string, Symbol *>::iterator ret = symbols.find(name);
+    auto ret = symbols.find(name);
     return ret == symbols.end() ? nullptr : ret->second;
 }
 
@@ -54,48 +57,97 @@ void SymbolTable::setSymbolGlobal(string name)
         symb->id = nextId++;
         symbols[name] = symb;
     }
+
+    if (getExternSymbol(name))
+        throw SyntaxError("Symbol " + name + " must be either global or extern, not both");
 }
 
 void SymbolTable::Symbol::clearFLink()
 {
-    while (flink)
-    { 
+    while (!flink.empty())
+    {
+        FLink f = flink.front();
         word tmp = value;
-        for (unsigned i = 0; i < flink->size; ++i)
+        for (unsigned i = 0; i < f.size; ++i)
         {
-            flink->section->bytes[flink->location + i] = tmp & 0xff;
+            f.section->bytes[f.location + i] = tmp & 0xff;
             tmp >>= 8;
         }
-        flink = flink->next;
+        flink.pop_front();
     }
 }
 
-void SymbolTable::write() const
+void SymbolTable::write(ofstream &output) const
 {
-    cout << "Symbol table" << endl;
-    cout << "Name\t"
-         << "Value\t"
-         << "Section\t"
-         << "Defined\t"
-         << "Global\t"
-         << "Id\t" << endl;
+    output << "=== Symbol table ===" << endl;
+    if (symbols.empty())
+    {
+        output << "No symbols" << endl;
+        return;
+    }
+
+    output << left << setw(10) << setfill(' ') << "Name";
+    output << left << setw(8) << setfill(' ') << "Value";
+    output << left << setw(8) << setfill(' ') << "Section";
+    output << left << setw(9) << setfill(' ') << "Defined";
+    output << left << setw(9) << setfill(' ') << "Global";
+    output << left << setw(8) << setfill(' ') << "Id";
+    output << endl;
+
     for (auto &symb : symbols)
     {
         Symbol *s = symb.second;
-        cout << s->name << '\t' << s->value << '\t' << ((long)s->section & 0xffff) << '\t' << (s->defined ? "true" : "false") << '\t'
-             << (s->global ? "true" : "false") << '\t' << s->id << endl;
+        output << left << setw(10) << setfill(' ') << s->name;
+        output << left << setw(8) << setfill(' ') << s->value;
+        output << left << setw(8) << setfill(' ') << (s->section ? s->section->id : 0);
+        output << left << setw(9) << setfill(' ') << (s->defined ? "true" : "false");
+        output << left << setw(9) << setfill(' ') << (s->global ? "true" : "false");
+        output << left << setw(8) << setfill(' ') << s->id;
+        output << endl;
     }
-    cout << endl
-         << "Extern symbols:\n";
-    for (auto &symb : externSymbols)
-    {
-        cout << symb.second << endl;
-    }
-    if (externSymbols.empty())
-        cout << "No extern symbols" << endl;
 }
 
 void SymbolTable::insertExternSymbol(string name)
 {
+    Symbol *s = getSymbol(name);
+    if (s && s->global)
+        throw SyntaxError("Symbol " + name + " must be either global or extern, not both");
     externSymbols[name] = name;
+}
+
+void SymbolTable::removeAllLocalSymbols()
+{
+    forward_list<string> tmp;
+    for (auto s : symbols)
+    {
+        Symbol *symb = s.second;
+        if (!symb->defined)
+        {
+            if (externSymbols.find(symb->name) == externSymbols.end())
+                throw UnrecognizedSymbol(symb->name);
+        }
+        else
+        {
+            if (externSymbols.find(symb->name) != externSymbols.end())
+                throw SyntaxError("Symbol " + symb->name + " is extern, but local definition found");
+            else if (!symb->global)
+                tmp.push_front(symb->name);
+        }
+    }
+    for (string name : tmp)
+    {
+        symbols.erase(name);
+    }
+}
+
+SymbolTable::Symbol *SymbolTable::getExternSymbol(string name) const
+{
+    auto ret = externSymbols.find(name);
+    return ret == externSymbols.end() ? nullptr : getSymbol(ret->second);
+}
+
+SymbolTable::~SymbolTable()
+{
+    for (auto s : symbols)
+        delete s.second;
 }

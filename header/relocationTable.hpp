@@ -1,10 +1,12 @@
 #ifndef RELOCATION_TABLE_H_
 #define RELOCATION_TABLE_H_
 
+#include "uncalculatedSymbolsTable.hpp"
 #include <string>
 #include <forward_list>
 #include <unordered_map>
-#include "uncalculatedSymbolsTable.hpp"
+#include <fstream>
+#include <iostream>
 using namespace std;
 
 struct Section;
@@ -32,11 +34,13 @@ public:
 
     RelocationTable(SymbolTable *symb) : symbTable(symb) {}
     void add(string name, Section *section, unsigned offset, RelocationType type, bool plus = true);
-    void write() const;
     void add(unordered_map<string, UncalculatedSymbolsTable::Symbol*> symbols);
     void replace();
+    void write(ofstream& output) const;
+    friend bool operator==(const Record &r1, const Record &r2);
+    
 private:
-    forward_list<RelocationTable::Record*> records;
+    forward_list<RelocationTable::Record> records;
     SymbolTable *symbTable;
 };
 

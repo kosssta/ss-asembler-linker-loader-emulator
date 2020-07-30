@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <unordered_map>
 #include <forward_list>
+#include <fstream>
+#include <iostream>
 using namespace std;
 
 typedef int16_t word;
@@ -29,9 +31,10 @@ public:
     };
 
     UncalculatedSymbolsTable(SymbolTable *symbTable, RelocationTable *relTable) : symbTable(symbTable), relTable(relTable) {}
-    void add(string name, string expression);
+    ~UncalculatedSymbolsTable();
+    void add(string name, string expression, Section *section = nullptr);
     Symbol *get(string name);
-    void write() const;
+    void write(ofstream& output) const;
     bool calculateAll();
 
 private:

@@ -1,14 +1,13 @@
 #include "uncalculatedSymbolsTable.hpp"
 #include "assembler.hpp"
-#include "syntaxError.hpp"
 #include "section.hpp"
-#include "symbolAlreadyDefinedError.hpp"
-#include <regex>
+#include "syntaxErrors.hpp"
+#include <iomanip>
 using namespace std;
 
 UncalculatedSymbolsTable::Symbol::Symbol(string name, string expression) : name(name), expression(expression), value(0)
 {
-    vector<string> elems = Assembler::splitString(expression, "(?:\\+|-|[^-\\+\\s]+)");
+    list<string> elems = Assembler::splitString(expression, "(?:\\+|-|[^-\\+\\s]+)");
     bool minusSign = false;
     for (string e : elems)
     {
@@ -38,7 +37,7 @@ bool UncalculatedSymbolsTable::Symbol::calculateValue(SymbolTable *symbTable, Re
     bool minusSign = false;
     unsigned i = 0;
 
-    vector<string> elems = Assembler::splitString(expression, "(?:\\+|-|[^-\\+\\s]+)");
+    list<string> elems = Assembler::splitString(expression, "(?:\\+|-|[^-\\+\\s]+)");
     for (string s : elems)
     {
         if (s == "+" || s == "-")
@@ -56,7 +55,7 @@ bool UncalculatedSymbolsTable::Symbol::calculateValue(SymbolTable *symbTable, Re
             {
                 bool status;
                 value += parseOperand(s, symbTable, relTable, minusSign, &status) * (minusSign ? -1 : 1);
-                if (!status)
+                if (!status && !symbTable->getExternSymbol(s))
                 {
                     ret = false;
                     updated_expresion.append((minusSign ? "-" : "+") + s);
@@ -105,32 +104,42 @@ word UncalculatedSymbolsTable::Symbol::parseOperand(string operand, SymbolTable 
     return number;
 }
 
-void UncalculatedSymbolsTable::add(string name, string expression)
+void UncalculatedSymbolsTable::add(string name, string expression, Section *section)
 {
     if (get(name))
-        throw SyntaxError("Multiple definition of simbol: " + name);
+        throw SymbolRedefinitionError(name);
 
     Symbol *symbol = new Symbol(name, expression);
     bool calculated = symbol->calculateValue(symbTable, relTable);
 
-    symbTable->insertSymbol(name, calculated, symbol->value, nullptr);
-
-    if (calculated)
-        delete symbol;
-    else
-        symbols[name] = symbol;
+    symbTable->insertSymbol(name, calculated, symbol->value, section);
+    symbols[name] = symbol;
 }
 
-void UncalculatedSymbolsTable::write() const
+void UncalculatedSymbolsTable::write(ofstream &output) const
 {
-    cout << "Uncalculated symbols:" << endl;
-    cout << "Name\tExpression\tValue\n";
+    output << "=== Uncalculated symbols ===" << endl;
+    if (symbols.empty())
+    {
+        output << "No symbols" << endl;
+        return;
+    }
+
+    output << left << setw(10) << setfill(' ') << "Name";
+    output << left << setw(12) << setfill(' ') << "Expression";
+    output << left << setw(8) << setfill(' ') << "Value";
+    output << endl;
 
     for (auto symb : symbols)
     {
         Symbol *s = symb.second;
         if (s->expression != "")
-            cout << s->name << '\t' << s->expression << "\t\t" << s->value << endl;
+        {
+            output << left << setw(10) << setfill(' ') << s->name;
+            output << left << setw(12) << setfill(' ') << s->expression;
+            output << left << setw(8) << setfill(' ') << s->value;
+            output << endl;
+        }
     }
 }
 
@@ -158,12 +167,21 @@ bool UncalculatedSymbolsTable::calculateAll()
 
     relTable->add(symbols);
 
+    bool ret = true;
     for (auto symb : symbols)
     {
         Symbol *s = symb.second;
         if (s->expression != "")
-            return false;
+            ret = false;
+        delete s;
     }
+    symbols.clear();
 
-    return true;
+    return ret;
+}
+
+UncalculatedSymbolsTable::~UncalculatedSymbolsTable()
+{
+    for (auto s : symbols)
+        delete s.second;
 }

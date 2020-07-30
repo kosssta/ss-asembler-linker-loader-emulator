@@ -1,12 +1,6 @@
 #include "sectionTable.hpp"
 #include "section.hpp"
-#include <iostream>
 using namespace std;
-
-SectionTable::SectionTable()
-{
-    global = new Section();
-}
 
 Section *SectionTable::addSection(string name, Section *section)
 {
@@ -28,27 +22,41 @@ Section *SectionTable::findSection(string name) const
     return nullptr;
 }
 
-void SectionTable::write() const
+void SectionTable::write(ofstream &output) const
 {
+    output << "=== Sections ===" << endl;
+    if (sections.empty())
+    {
+        output << "No sections" << endl;
+        return;
+    }
+
     for (auto &s : sections)
     {
         Section *curr = s.second;
 
-        cout << '.' << s.first << ':' << endl; 
-        cout << "Length = " << curr->bytes.size() << endl;
+        output << curr->name << ':' << endl;
+        output << "Length = " << curr->bytes.size() << endl;
         for (byte b : curr->bytes)
         {
             byte tmp = (b >> 4) & 0x0f;
             if (tmp < 10)
-                cout << (char)('0' + tmp);
+                output << (char)('0' + tmp);
             else
-                cout << (char)('A' - 10 + tmp);
+                output << (char)('A' - 10 + tmp);
             tmp = b & 0x0f;
             if (tmp < 10)
-                cout << (char)('0' + tmp) << ' ';
+                output << (char)('0' + tmp) << ' ';
             else
-                cout << (char)('A' - 10 + tmp) << ' ';
+                output << (char)('A' - 10 + tmp) << ' ';
         }
-        cout << endl;
+        output << endl
+               << endl;
     }
+}
+
+SectionTable::~SectionTable()
+{
+    for (auto s : sections)
+        delete s.second;
 }
