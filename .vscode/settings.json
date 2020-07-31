@@ -3,6 +3,8 @@
         "*.tcc": "cpp",
         "optional": "cpp",
         "numeric": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "iomanip": "cpp",
+        "ostream": "cpp"
     }
 }
