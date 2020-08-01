@@ -115,12 +115,12 @@ bool operator<(const RelocationTable::Record &r1, const RelocationTable::Record 
     return r1.section->id < r2.section->id || r1.section->id == r2.section->id && r1.offset < r2.offset;
 }
 
-unsigned RelocationTable::writeBinary(ofstream &output)
+unsigned RelocationTable::writeBinary(ofstream &output, Section *section)
 {
-    struct RecordBinary {
+    struct RecordBinary
+    {
         unsigned symbol;
         unsigned offset;
-        unsigned section;
         RelocationType type;
         bool plus;
     };
@@ -129,14 +129,16 @@ unsigned RelocationTable::writeBinary(ofstream &output)
     unsigned cnt = 0;
     for (Record &r : records)
     {
-        ++cnt;
-        SymbolTable::Symbol *symb = symbTable->getSymbol(r.name);
-        rb.symbol = symb && symb->section ? (symb->global ? symb->id : symb->section->id) : 0;
-        rb.offset = r.offset;
-        rb.section = r.section ? r.section->id : 0;
-        rb.type = r.type;
-        rb.plus = r.plus;
-        output.write((char *) &rb, sizeof(rb));
+        if (r.section->id == section->id)
+        {
+            ++cnt;
+            SymbolTable::Symbol *symb = symbTable->getSymbol(r.name);
+            rb.symbol = symb && symb->section ? (symb->global ? symb->id : symb->section->id) : 0;
+            rb.offset = r.offset;
+            rb.type = r.type;
+            rb.plus = r.plus;
+            output.write((char *)&rb, sizeof(rb));
+        }
     }
 
     return cnt;

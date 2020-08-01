@@ -1,5 +1,6 @@
 #include "sectionTable.hpp"
 #include "section.hpp"
+#include "relocationTable.hpp"
 #include <list>
 using namespace std;
 
@@ -74,7 +75,7 @@ forward_list<string> SectionTable::getAllNames() const
     return ret;
 }
 
-unsigned SectionTable::writeBinary(ofstream &output) const
+unsigned SectionTable::writeBinary(ofstream &output, RelocationTable *relTable) const
 {
     struct SectionBinary
     {
@@ -82,20 +83,35 @@ unsigned SectionTable::writeBinary(ofstream &output) const
         unsigned id;
         unsigned length;
         char access_rights;
+        unsigned num_relocations;
     };
 
-    SectionBinary sb;
+    list<Section> secs;
+
     for (auto s : sections)
     {
-        Section *sec = s.second;
-        sb.nameLength = sec->name.size();
-        sb.id = sec->id;
-        sb.access_rights = sec->access_rights;
-        sb.length = sec->bytes.size();
+        secs.push_back(*s.second);
+    }
 
-        output.write((char *) &sb, sizeof(sb));
-        output << sec->name;
-        output.write((char *)&sec->bytes[0], sec->bytes.size() * sizeof(sec->bytes[0]));
+    secs.sort();
+
+    SectionBinary sb;
+    for (auto sec : secs)
+    {
+        sb.nameLength = sec.name.size();
+        sb.id = sec.id;
+        sb.access_rights = sec.access_rights;
+        sb.length = sec.bytes.size();
+
+        unsigned tmp = output.tellp();
+        output.write((char *)&sb, sizeof(sb));
+        output << sec.name;
+        output.write((char *)&sec.bytes[0], sec.bytes.size() * sizeof(sec.bytes[0]));
+        sb.num_relocations = relTable->writeBinary(output, &sec);
+        unsigned tmp2 = output.tellp();
+        output.seekp(tmp);
+        output.write((char *)&sb, sizeof(sb));
+        output.seekp(tmp2);
     }
     return sections.size();
 }

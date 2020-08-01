@@ -9,6 +9,7 @@
 using namespace std;
 
 struct Section;
+class RelocationTable;
 
 class SectionTable {
     unordered_map<string, Section*> sections;
@@ -19,7 +20,7 @@ class SectionTable {
     Section* findSection(string name) const;
     forward_list<string> getAllNames() const;
     void write(ofstream& output) const;
-    unsigned writeBinary(ofstream& output) const;
+    unsigned writeBinary(ofstream& output, RelocationTable *relTable) const;
     friend bool operator<(const Section &s1, const Section &s2);
 };
 

@@ -38,7 +38,7 @@ public:
     void add(unordered_map<string, UncalculatedSymbolsTable::Symbol*> symbols);
     void replace();
     void write(ofstream& output, SectionTable *sections);
-    unsigned writeBinary(ofstream& output);
+    unsigned writeBinary(ofstream& output, Section *section);
     void sort();
 
     friend bool operator==(const Record &r1, const Record &r2);

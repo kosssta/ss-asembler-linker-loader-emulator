@@ -1,10 +1,5 @@
 {
     "files.associations": {
-        "*.tcc": "cpp",
-        "optional": "cpp",
-        "numeric": "cpp",
-        "cmath": "cpp",
-        "iomanip": "cpp",
-        "ostream": "cpp"
+        "*.tcc": "cpp"
     }
 }

@@ -1,3 +1,4 @@
-test/
-.vscode/
+z1/test/
+z2/test/
+.*
 *~

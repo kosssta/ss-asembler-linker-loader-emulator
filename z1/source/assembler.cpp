@@ -74,19 +74,16 @@ void Assembler::assembly(string input_file, string output_file)
 
     unsigned symbolTableSize = 0;
     unsigned sectionTableSize = 0;
-    unsigned relocationsSize = 0;
 
-    for(unsigned i = 0; i < 3; ++i)
+    for(unsigned i = 0; i < 2; ++i)
         bin_output.write((char *) &symbolTableSize, sizeof(symbolTableSize));
 
+    sectionTableSize = sectionTable.writeBinary(bin_output, &relocationTable);
     symbolTableSize = symbolTable.writeBinary(bin_output);
-    sectionTableSize = sectionTable.writeBinary(bin_output);
-    relocationsSize = relocationTable.writeBinary(bin_output);
     
     bin_output.seekp(0);
-    bin_output.write((char *) &symbolTableSize, sizeof(symbolTableSize));
     bin_output.write((char *) &sectionTableSize, sizeof(sectionTableSize));
-    bin_output.write((char *) &relocationsSize, sizeof(relocationsSize));
+    bin_output.write((char *) &symbolTableSize, sizeof(symbolTableSize));
 
     bin_output.close();
 }
