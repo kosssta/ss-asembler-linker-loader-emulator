@@ -13,6 +13,7 @@ struct Section {
     unsigned id;
     vector<byte> bytes;
     char access_rights;
+    unsigned start_address;
     RelocationTable relocationTable;
 
     Section(string name, unsigned id = 0, char access_rights = 0) : name(name), id(id), access_rights(access_rights) {}

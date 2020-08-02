@@ -26,6 +26,7 @@ public:
 
     unsigned addSymbol(string name, word value, Section *section, bool global);
     Symbol* getSymbol(string name) const;
+    Symbol* getSymbol(unsigned id) const;
 
 private:
     unordered_map<string, Symbol*> symbols;

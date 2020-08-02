@@ -1,6 +1,6 @@
-#include "lineParser.hpp"
-#include "instruction.hpp"
-#include "syntaxErrors.hpp"
+#include "../header/lineParser.hpp"
+#include "../header/instruction.hpp"
+#include "../header/syntaxErrors.hpp"
 #include <regex>
 using namespace std;
 

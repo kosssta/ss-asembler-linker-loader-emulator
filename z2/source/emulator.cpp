@@ -1,6 +1,6 @@
-#include "emulator.hpp"
-#include "syntaxErrors.hpp"
-#include "linker.hpp"
+#include "../header/emulator.hpp"
+#include "../header/syntaxErrors.hpp"
+#include "../header/linker.hpp"
 #include <regex>
 #include <iostream>
 using namespace std;
@@ -15,11 +15,12 @@ Emulator::Emulator(char *input_files[], unsigned cnt)
             unsigned pos = file.find('@');
             if (pos == string::npos)
                 throw SyntaxError("Error: Usage -> emulator [-place=<section_name>@<location>] input_files");
-            places[file.substr(7, pos - 7)] = Emulator::parseInt(file.substr(pos + 1));
+            places.push_front(make_pair<unsigned, string>(Emulator::parseInt(file.substr(pos + 1)), file.substr(7, pos - 7)));
         }
         else
             this->input_files.push_back(file);
     }
+    places.sort();
 }
 
 unsigned Emulator::parseInt(string arg)
@@ -61,5 +62,6 @@ void Emulator::emulate()
 {
     Linker linker;
     linker.link(input_files);
+    linker.place(places);
     
 }

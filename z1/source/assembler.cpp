@@ -1,8 +1,8 @@
-#include "assembler.hpp"
-#include "instruction.hpp"
-#include "lineParser.hpp"
-#include "syntaxErrors.hpp"
-#include "section.hpp"
+#include "../header/assembler.hpp"
+#include "../header/instruction.hpp"
+#include "../header/lineParser.hpp"
+#include "../header/syntaxErrors.hpp"
+#include "../header/section.hpp"
 #include <iostream>
 #include <fstream>
 #include <regex>
@@ -75,15 +75,15 @@ void Assembler::assembly(string input_file, string output_file)
     unsigned symbolTableSize = 0;
     unsigned sectionTableSize = 0;
 
-    for(unsigned i = 0; i < 2; ++i)
-        bin_output.write((char *) &symbolTableSize, sizeof(symbolTableSize));
+    for (unsigned i = 0; i < 2; ++i)
+        bin_output.write((char *)&symbolTableSize, sizeof(symbolTableSize));
 
     sectionTableSize = sectionTable.writeBinary(bin_output, &relocationTable);
     symbolTableSize = symbolTable.writeBinary(bin_output);
-    
+
     bin_output.seekp(0);
-    bin_output.write((char *) &sectionTableSize, sizeof(sectionTableSize));
-    bin_output.write((char *) &symbolTableSize, sizeof(symbolTableSize));
+    bin_output.write((char *)&sectionTableSize, sizeof(sectionTableSize));
+    bin_output.write((char *)&symbolTableSize, sizeof(symbolTableSize));
 
     bin_output.close();
 }
@@ -126,12 +126,11 @@ void Assembler::processCommand(Instruction *instr)
     if (instructionDetails.operand_size == 2)
         op_code |= 1 << 2;
     else if (instructionDetails.operand_size == -1)
-    {
         op_code |= 1 << 2;
-    }
 
     current_section->bytes.push_back(op_code);
 
+    bool mem_addr = false;
     string operands[2] = {instr->op1, instr->op2};
     for (unsigned i = 0; i < instructionDetails.num_operands; ++i)
     {
@@ -152,7 +151,12 @@ void Assembler::processCommand(Instruction *instr)
                 if (operand[1] == '%')
                     processRegister(operand.substr(2));
                 else
+                {
+                    if (mem_addr)
+                        throw SyntaxError("Memory addressing allowed for one operand only");
                     processLiteralOrSymbol(operand.substr(1), 2, 4);
+                    mem_addr = true;
+                }
             }
             else if (!instructionDetails.jump && operand[0] == '$')
             {
@@ -164,7 +168,12 @@ void Assembler::processCommand(Instruction *instr)
             else if (!instructionDetails.jump && operand[0] == '%')
                 processRegister(operand.substr(1)); // %r<num>
             else
+            {
+                if (!instructionDetails.jump && mem_addr)
+                    throw SyntaxError("Memory addressing allowed for one operand only");
                 processLiteralOrSymbol(operand, 2, instructionDetails.jump ? 0 : 4); // <literal> ili <simbol>
+                mem_addr = true;
+            }
         }
         else
         {
@@ -190,7 +199,11 @@ void Assembler::processCommand(Instruction *instr)
                 // <literal>(%r<num>) ili <simbol>(%r<num>) ili <simbol>(%pc/%r7)
                 string reg = sm.str(3).substr(1);
                 unsigned size = processRegister(reg, 3);
-                processLiteralOrSymbol(operand, size, -1, reg == "pc" || reg == "r7");
+
+                if (mem_addr)
+                    throw SyntaxError("Memory addressing allowed for one operand only");
+                processLiteralOrSymbol(operand, size, -1, reg == "pc" || reg == "r7" ? (i == 0 && instructionDetails.num_operands == 2 ? 5 : 2) : -1);
+                mem_addr = true;
             }
         }
     }
@@ -397,8 +410,10 @@ unsigned Assembler::processRegister(string operand, byte op_code)
     return r.size;
 }
 
-void Assembler::processLiteralOrSymbol(string operand, unsigned size, byte op_code, bool pc_rel)
+void Assembler::processLiteralOrSymbol(string operand, unsigned size, byte op_code, byte pc_rel_off)
 {
+    bool pc_rel = pc_rel_off != -1;
+
     if (op_code != -1)
         current_section->bytes.push_back(op_code << 5);
 
@@ -412,14 +427,14 @@ void Assembler::processLiteralOrSymbol(string operand, unsigned size, byte op_co
         throw SyntaxError("Literals not allowed with pc relative addressing");
 
     SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
-    if (symb && !symb->defined)
+    /*if (symb && !symb->defined)
         symb->addFLink(current_section, current_section->bytes.size(), size);
-
+*/
     if (symb && symb->global)
         number = 0;
 
     if (pc_rel)
-        number -= 2;
+        number -= pc_rel_off;
 
     current_section->bytes.push_back(number & 0xff);
     if (size == 2)

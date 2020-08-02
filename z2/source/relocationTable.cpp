@@ -5,3 +5,6 @@ RelocationTable::Record* RelocationTable::add(unsigned symbol, unsigned offset, 
     return &records.front();
 }
 
+bool RelocationTable::operator()(const RelocationTable::Record &r) {
+    return r.symbol == 0;
+}

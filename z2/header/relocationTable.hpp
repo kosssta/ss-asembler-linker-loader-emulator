@@ -25,9 +25,11 @@ public:
     };
 
     Record* add(unsigned symbol, unsigned offset, RelocationType type, bool plus = true);
+    bool operator()(const Record &r);
 
+forward_list<RelocationTable::Record> records;
 private:
-    forward_list<RelocationTable::Record> records;
+    
 };
 
 #endif

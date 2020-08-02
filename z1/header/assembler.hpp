@@ -1,10 +1,10 @@
 #ifndef ASSEMBLER_H_
 #define ASSEMBLER_H_
 
-#include "symbolTable.hpp"
-#include "sectionTable.hpp"
-#include "uncalculatedSymbolsTable.hpp"
-#include "relocationTable.hpp"
+#include "../header/symbolTable.hpp"
+#include "../header/sectionTable.hpp"
+#include "../header/uncalculatedSymbolsTable.hpp"
+#include "../header/relocationTable.hpp"
 #include <string>
 #include <list>
 using namespace std;
@@ -39,7 +39,7 @@ private:
     void processCommand(Instruction *instr);
     void processLabel(string label);
     unsigned processRegister(string operand, byte op_code = 1);
-    void processLiteralOrSymbol(string operand, unsigned size, byte op_code = 0, bool pc_rel = false);
+    void processLiteralOrSymbol(string operand, unsigned size, byte op_code = 0, byte pc_rel_off = -1);
 };
 
 #endif

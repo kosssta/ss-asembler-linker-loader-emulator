@@ -1,7 +1,7 @@
+#include "../header/assembler.hpp"
 #include <iostream>
 #include <string>
 #include <string.h>
-#include "assembler.hpp"
 using namespace std;
 
 int main(int argc, char *argv[])

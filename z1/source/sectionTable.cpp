@@ -1,6 +1,6 @@
-#include "sectionTable.hpp"
-#include "section.hpp"
-#include "relocationTable.hpp"
+#include "../header/sectionTable.hpp"
+#include "../header/section.hpp"
+#include "../header/relocationTable.hpp"
 #include <list>
 using namespace std;
 

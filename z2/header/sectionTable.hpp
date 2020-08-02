@@ -12,8 +12,8 @@ class SectionTable {
     Section* addSection(Section *section);
     Section* findSection(string name) const;
     
-    private:
     unordered_map<string, Section *> sections;
+    private:
 };
 
 #endif

@@ -1,7 +1,7 @@
-#include "uncalculatedSymbolsTable.hpp"
-#include "assembler.hpp"
-#include "section.hpp"
-#include "syntaxErrors.hpp"
+#include "../header/uncalculatedSymbolsTable.hpp"
+#include "../header/assembler.hpp"
+#include "../header/section.hpp"
+#include "../header/syntaxErrors.hpp"
 #include <iomanip>
 using namespace std;
 

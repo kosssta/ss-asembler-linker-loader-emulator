@@ -1,7 +1,7 @@
-#include "relocationTable.hpp"
-#include "symbolTable.hpp"
-#include "section.hpp"
-#include "sectionTable.hpp"
+#include "../header/relocationTable.hpp"
+#include "../header/symbolTable.hpp"
+#include "../header/section.hpp"
+#include "../header/sectionTable.hpp"
 #include <iomanip>
 using namespace std;
 
@@ -45,7 +45,7 @@ void RelocationTable::write(ofstream &output, SectionTable *sections)
         for (const Record *r : rec)
         {
             SymbolTable::Symbol *symb = symbTable->getSymbol(r->name);
-            output << left << setw(10) << setfill(' ') << (symb && symb->section ? (symb->global ? symb->id : symb->section->id) : 0);
+            output << left << setw(10) << setfill(' ') << (symb ? (symb->global || !symb->defined ? symb->id : symb->section->id) : 0);
             output << left << setw(8) << setfill(' ') << r->offset;
             output << left << setw(15) << setfill(' ') << (r->type == R_X86_64_PC16 ? "R_X86_64_PC16" : r->type == R_X86_64_8 ? "R_X86_64_8" : "R_X86_64_16");
             output << left << setw(5) << setfill(' ') << (r->plus ? '+' : '-');
@@ -89,11 +89,11 @@ void RelocationTable::replace()
         auto symbol = symbTable->getSymbol(r.name);
         if (symbol && symbol->defined && symbol->section)
             if (!symbol->global)
-                r.name = r.section->name;
-            else
+                r.name = symbol->section->name;
+            else if (r.type != R_X86_64_PC16)
             {
                 r.section->bytes[r.offset] = 0;
-                if (r.type != R_X86_64_8)
+                if (r.type == R_X86_64_16)
                     r.section->bytes[r.offset + 1] = 0;
             }
     }
@@ -102,7 +102,7 @@ void RelocationTable::replace()
 bool RelocationTable::operator()(const RelocationTable::Record &r)
 {
     SymbolTable::Symbol *symb = symbTable->getSymbol(r.name);
-    return !symb || !symb->defined || !symb->section || r.type == R_X86_64_PC16 && !symb->global && symb->section == r.section;
+    return !symb || r.type == R_X86_64_PC16 && !symb->global && symb->section == r.section;
 }
 
 void RelocationTable::sort()
@@ -133,7 +133,7 @@ unsigned RelocationTable::writeBinary(ofstream &output, Section *section)
         {
             ++cnt;
             SymbolTable::Symbol *symb = symbTable->getSymbol(r.name);
-            rb.symbol = symb && symb->section ? (symb->global ? symb->id : symb->section->id) : 0;
+            rb.symbol = symb ? (symb->global || !symb->defined ? symb->id : symb->section->id) : 0;
             rb.offset = r.offset;
             rb.type = r.type;
             rb.plus = r.plus;

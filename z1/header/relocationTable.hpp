@@ -1,7 +1,7 @@
 #ifndef RELOCATION_TABLE_H_
 #define RELOCATION_TABLE_H_
 
-#include "uncalculatedSymbolsTable.hpp"
+#include "../header/uncalculatedSymbolsTable.hpp"
 #include <string>
 #include <forward_list>
 #include <unordered_map>

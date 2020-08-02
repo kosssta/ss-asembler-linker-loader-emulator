@@ -1,5 +1,5 @@
-#include "emulator.hpp"
-#include "syntaxErrors.hpp"
+#include "../header/emulator.hpp"
+#include "../header/syntaxErrors.hpp"
 #include <iostream>
 #include <fstream>
 using namespace std;

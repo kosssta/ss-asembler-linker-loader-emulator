@@ -13,6 +13,10 @@ unsigned SymbolTable::addSymbol(string name, word value, Section *section, bool 
         throw MultipleDefinitionError(name);
 
     s->global |= global;
+    if (global) {
+        s->section = section;
+        s->value = value;
+    }
     return s->id;
 }
 
@@ -20,4 +24,12 @@ SymbolTable::Symbol *SymbolTable::getSymbol(string name) const
 {
     auto s = symbols.find(name);
     return s == symbols.end() ? nullptr : s->second;
+}
+
+SymbolTable::Symbol *SymbolTable::getSymbol(unsigned id) const
+{
+    for (auto s : symbols)
+        if (s.second->id == id)
+            return s.second;
+    return nullptr;
 }

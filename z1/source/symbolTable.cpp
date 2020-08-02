@@ -1,6 +1,6 @@
-#include "symbolTable.hpp"
-#include "section.hpp"
-#include "syntaxErrors.hpp"
+#include "../header/symbolTable.hpp"
+#include "../header/section.hpp"
+#include "../header/syntaxErrors.hpp"
 #include <iomanip>
 using namespace std;
 
@@ -71,14 +71,25 @@ void SymbolTable::setSymbolGlobal(string name)
 
 void SymbolTable::Symbol::clearFLink()
 {
+    if (global)
+    {
+        flink.clear();
+        return;
+    }
+
     while (!flink.empty())
     {
         FLink f = flink.front();
-        word tmp = value;
+        word val = 0;
         for (unsigned i = 0; i < f.size; ++i)
         {
-            f.section->bytes[f.location + i] = tmp & 0xff;
-            tmp >>= 8;
+            val |= f.section->bytes[f.location + i] << i * 8;
+        }
+        val += value;
+        for (unsigned i = 0; i < f.size; ++i)
+        {
+            f.section->bytes[f.location + i] = val & 0xff;
+            val >>= 8;
         }
         flink.pop_front();
     }
@@ -186,24 +197,27 @@ bool operator<(const SymbolTable::Symbol &s1, const SymbolTable::Symbol &s2)
     return s1.name[0] == '.' && s2.name[0] != '.' || (s1.name[0] == '.' && s2.name[0] == '.' || s1.name[0] != '.' && s2.name[0] != '.') && s1.id < s2.id;
 }
 
-unsigned SymbolTable::writeBinary(ofstream& output) {
+unsigned SymbolTable::writeBinary(ofstream &output)
+{
     list<Symbol> symbols = sort();
-    struct BinarySymbol {
+    struct BinarySymbol
+    {
         unsigned nameLength;
         word value;
         unsigned section;
         bool global;
         unsigned id;
     };
-    
+
     BinarySymbol bs;
-    for (Symbol& s : symbols) {
+    for (Symbol &s : symbols)
+    {
         bs.nameLength = s.name.size();
         bs.value = s.value;
         bs.section = s.section ? s.section->id : 0;
         bs.global = s.global;
         bs.id = s.id;
-        output.write((char *) &bs, sizeof(bs));
+        output.write((char *)&bs, sizeof(bs));
         output << s.name;
     }
 
