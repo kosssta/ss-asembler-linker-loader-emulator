@@ -96,15 +96,20 @@ void Linker::link(list<string> input_files)
             if (r->type == RelocationTable::R_X86_64_PC16 && offset)
             {
                 word val = 0;
-                Section *sec = symbols.getSymbol(r->symbol)->section;
-                val = sec->bytes[r->offset] | sec->bytes[r->offset] << 8;
-                val -= offset;
+                SymbolTable::Symbol *symb = symbols.getSymbol(r->symbol);
+                if (!symbols.isSection(symb->name))
+                    continue;
+                Section *sec = symb->section;
+                val = sec->bytes[r->offset] | sec->bytes[r->offset + 1] << 8;
+                val += offset;
                 sec->bytes[r->offset] = val & 0xff;
-                sec->bytes[r->offset] = val & 0xff00;
+                sec->bytes[r->offset] = val >> 8 & 0xff;
             }
         }
         input.close();
     }
+
+    symbols.checkUndefinedSymbols();
 
     for (auto s : sections.sections)
     {
@@ -112,33 +117,117 @@ void Linker::link(list<string> input_files)
         for (RelocationTable::Record &r : sec->relocationTable.records)
         {
             SymbolTable::Symbol *symbol = symbols.getSymbol(r.symbol);
-            if (symbol && symbol->section)
+
+            word number = 0;
+            switch (r.type)
             {
-                word number = 0;
-                switch (r.type)
-                {
-                case RelocationTable::R_X86_64_8:
-                    number = sec->bytes[r.offset];
-                    number += symbol->value * (r.plus ? 1 : -1);
-                    sec->bytes[r.offset] = number & 0xff;
-                    break;
-                case RelocationTable::R_X86_64_16:
-                    number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
-                    number += symbol->value * (r.plus ? 1 : -1);
-                    sec->bytes[r.offset] += number & 0xff;
-                    sec->bytes[r.offset + 1] += number & 0xff00;
-                    break;
-                case RelocationTable::R_X86_64_PC16:
-                    number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
-                    number += symbol->value * (r.plus ? 1 : -1);
-                    sec->bytes[r.offset] += number & 0xff;
-                    sec->bytes[r.offset + 1] += number & 0xff00;
-                    break;
-                }
+            case RelocationTable::R_X86_64_8:
+                number = sec->bytes[r.offset];
+                number += symbol->value * (r.plus ? 1 : -1);
+                sec->bytes[r.offset] = number & 0xff;
+                if (!symbols.isSection(symbol->name))
+                    r.symbol = symbol->section->id;
+                break;
+            case RelocationTable::R_X86_64_16:
+                number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
+                number += symbol->value * (r.plus ? 1 : -1);
+                sec->bytes[r.offset] = number & 0xff;
+                sec->bytes[r.offset + 1] = number >> 8 & 0xff;
+                if (!symbols.isSection(symbol->name))
+                    r.symbol = symbol->section->id;
+                break;
+            case RelocationTable::R_X86_64_PC16:
+                number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
+                number += symbol->value - r.offset;
+                sec->bytes[r.offset] = number & 0xff;
+                sec->bytes[r.offset + 1] = number >> 8 & 0xff;
+                if (symbol->section->id == sec->id)
+                    r.symbol = 0;
+                else if (!symbols.isSection(symbol->name))
+                    r.symbol = symbol->section->id;
+                break;
             }
-            else
-                throw SyntaxError("Undefined symbol: " + (symbol ? symbol->name : "?"));
         }
+        sec->relocationTable.records.remove_if(sec->relocationTable);
+    }
+}
+
+void Linker::place(const list<pair<unsigned, string>> &places)
+{
+    Section *iv_table = sections.addSection(new Section(".iv_table"));
+    iv_table->start_address = 0;
+    symbols.addSymbol(".iv_table", 0, iv_table, false);
+    next_free_address = Emulator::IV_TABLE_NUM_ENTRIES * Emulator::IV_TABLE_ENTRY_SIZE;
+    for (unsigned i = 0; i < next_free_address; ++i)
+        iv_table->bytes.push_back(0);
+
+    Section *prev = iv_table;
+    for (auto p : places)
+    {
+        Section *s = sections.findSection("." + p.second);
+        if (!s)
+            throw SyntaxError("Section " + p.second + " does not exist");
+
+        if (s->start_address != -1)
+            throw SyntaxError("Error: Found more -place attributes for section " + s->name);
+
+        if (p.first < next_free_address)
+            throw SyntaxError("Section ." + p.second + " is overlapping with section " + (prev ? prev->name : "??"));
+
+        if (p.first + s->bytes.size() > Emulator::MEMORY_CAPACITY)
+            throw SyntaxError("Section ." + p.second + " cannot fit in memory starting from the address " + Linker::unsigned2str(p.first));
+
+        s->start_address = p.first;
+        next_free_address = s->start_address + s->bytes.size();
+        prev = s;
+    }
+    for (auto s : sections.sections)
+    {
+        Section *sec = s.second;
+        if (sec->start_address == -1)
+        {
+            sec->start_address = next_free_address;
+            next_free_address += sec->bytes.size();
+            if (next_free_address > Emulator::MEMORY_CAPACITY)
+                throw SyntaxError("Section " + sec->name + " cannot fit in memory starting from address " + Linker::unsigned2str(sec->start_address));
+        }
+    }
+}
+
+unordered_map<unsigned, vector<byte> *> Linker::getAllSections()
+{
+    unordered_map<unsigned, vector<byte> *> ret;
+
+    for (auto s : sections.sections)
+    {
+        Section *sec = s.second;
+        for (RelocationTable::Record &r : sec->relocationTable.records)
+        {
+            SymbolTable::Symbol *symbol = symbols.getSymbol(r.symbol);
+
+            word number = 0;
+            switch (r.type)
+            {
+            case RelocationTable::R_X86_64_8:
+                number = sec->bytes[r.offset];
+                number += symbol->section->start_address;
+                sec->bytes[r.offset] = number & 0xff;
+                break;
+            case RelocationTable::R_X86_64_16:
+                number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
+                number += symbol->section->start_address;
+                sec->bytes[r.offset] = number & 0xff;
+                sec->bytes[r.offset + 1] = number >> 8 & 0xff;
+                break;
+            case RelocationTable::R_X86_64_PC16:
+                number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
+                number += symbol->section->start_address; // nzm treba li - sec->start_address ??;
+                sec->bytes[r.offset] = number & 0xff;
+                sec->bytes[r.offset + 1] = number >> 8 & 0xff;
+                break;
+            }
+        }
+        ret[sec->start_address] = &sec->bytes;
     }
     ofstream output("../test/test.txt");
 
@@ -165,74 +254,20 @@ void Linker::link(list<string> input_files)
         output << ".rel" + s.name << endl;
         for (RelocationTable::Record &r : s.relocationTable.records)
         {
-            output << r.symbol << ' ' << r.offset << ' ' << r.type << ' ' << r.plus << endl;
+            output << r.offset << ' ' << (r.plus ? '+' : '-') << ' ' << r.type << ' ' << r.symbol << endl;
         }
         output << endl;
     }
     output.close();
-}
-
-void Linker::place(const list<pair<unsigned, string>> &places)
-{
-    Section *prev = nullptr;
-    for (auto p : places)
-    {
-        Section *s = sections.findSection("." + p.second);
-        if (!s)
-            throw SyntaxError("Section " + p.second + " does not exist");
-
-        if (p.first < next_free_address)
-            throw SyntaxError("Section " + p.second + " is overlapping with section " + (prev ? prev->name : "??"));
-
-        if (p.first + s->bytes.size() > Emulator::MEMORY_CAPACITY)
-            throw SyntaxError("Section " + p.second + " cannot fit in memory starting from the address " + Linker::unsigned2str(p.first));
-
-        s->start_address = p.first;
-        next_free_address += s->start_address + s->bytes.size();
-        prev = s;
-    }
-}
-
-unordered_map<unsigned, vector<byte>*> Linker::getAllSections()
-{
-    unordered_map<unsigned, vector<byte>*> ret;
-
-    for (auto s : sections.sections)
-    {
-        Section *sec = s.second;
-        for (RelocationTable::Record &r : sec->relocationTable.records)
-        {
-            SymbolTable::Symbol *symbol = symbols.getSymbol(r.symbol);
-            if (symbol && symbol->section)
-            {
-                word number = 0;
-                switch (r.type)
-                {
-                case RelocationTable::R_X86_64_8:
-                    number = sec->bytes[r.offset];
-                    number += symbol->section->start_address * (r.plus ? 1 : -1);
-                    sec->bytes[r.offset] = number & 0xff;
-                    break;
-                case RelocationTable::R_X86_64_16:
-                    number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
-                    number += symbol->section->start_address * (r.plus ? 1 : -1);
-                    sec->bytes[r.offset] += number & 0xff;
-                    sec->bytes[r.offset + 1] += number & 0xff00;
-                    break;
-                case RelocationTable::R_X86_64_PC16:
-                    number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
-                    number += symbol->section->start_address * (r.plus ? 1 : -1);
-                    sec->bytes[r.offset] += number & 0xff;
-                    sec->bytes[r.offset + 1] += number & 0xff00;
-                    break;
-                }
-            }
-            else
-                throw SyntaxError("Undefined symbol: " + (symbol ? symbol->name : "?"));
-        }
-        ret[sec->start_address] = &sec->bytes;
-    }
     return ret;
+}
+
+unsigned Linker::getMain() const
+{
+    SymbolTable::Symbol *main = symbols.getSymbol("main");
+    if (!main)
+        throw SyntaxError("Symbol main not found");
+    return main->value + main->section->start_address;
 }
 
 string Linker::unsigned2str(unsigned number)

@@ -27,6 +27,8 @@ public:
     unsigned addSymbol(string name, word value, Section *section, bool global);
     Symbol* getSymbol(string name) const;
     Symbol* getSymbol(unsigned id) const;
+    bool isSection(string name) const;
+    void checkUndefinedSymbols() const;
 
 private:
     unordered_map<string, Symbol*> symbols;

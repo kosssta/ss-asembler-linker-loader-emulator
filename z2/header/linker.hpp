@@ -18,6 +18,7 @@ public:
     void link(list<string> input_files);
     void place(const list<pair<unsigned, string>> &places);
     unordered_map<unsigned, vector<byte>*> getAllSections();
+    unsigned getMain() const;
 
     static string unsigned2str(unsigned number);
 

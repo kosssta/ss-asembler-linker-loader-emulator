@@ -1,5 +1,6 @@
 #include "../header/symbolTable.hpp"
 #include "../header/syntaxErrors.hpp"
+#include "../header/section.hpp"
 
 unsigned SymbolTable::addSymbol(string name, word value, Section *section, bool global)
 {
@@ -13,7 +14,8 @@ unsigned SymbolTable::addSymbol(string name, word value, Section *section, bool 
         throw MultipleDefinitionError(name);
 
     s->global |= global;
-    if (global) {
+    if (global)
+    {
         s->section = section;
         s->value = value;
     }
@@ -32,4 +34,22 @@ SymbolTable::Symbol *SymbolTable::getSymbol(unsigned id) const
         if (s.second->id == id)
             return s.second;
     return nullptr;
+}
+
+bool SymbolTable::isSection(string name) const
+{
+    Symbol *symb = getSymbol(name);
+    return symb && symb->section && symb->section->id == symb->id;
+}
+
+void SymbolTable::checkUndefinedSymbols() const
+{
+    string undefinedSymbols;
+
+    for (auto s : symbols)
+        if (s.second->section == nullptr)
+            undefinedSymbols += (undefinedSymbols.empty() ? "" : ", ") + s.second->name;
+
+    if (!undefinedSymbols.empty())
+        throw SyntaxError("Undefined symbols: " + undefinedSymbols);
 }
