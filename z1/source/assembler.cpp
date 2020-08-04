@@ -202,7 +202,7 @@ void Assembler::processCommand(Instruction *instr)
 
                 if (mem_addr)
                     throw SyntaxError("Memory addressing allowed for one operand only");
-                processLiteralOrSymbol(operand, size, -1, reg == "pc" || reg == "r7" ? (i == 0 && instructionDetails.num_operands == 2 ? 5 : 2) : -1);
+                processLiteralOrSymbol(operand, size, -1, reg == "pc" || reg == "r7" ? (i == 0 && instructionDetails.num_operands == 2 && !regex_match(operands[i + 1], regex("\\*?%.*")) ? 5 : 2) : -1);
                 mem_addr = true;
             }
         }
