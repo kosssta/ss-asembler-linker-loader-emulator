@@ -84,7 +84,7 @@ void Linker::link(list<string> input_files)
             name[symb.nameLength] = '\0';
             input.read(name, symb.nameLength * sizeof(name[0]));
             auto secId = sectionId.find(changedIds[symb.section]);
-            unsigned id = symbols.addSymbol(name, symb.value, secId == sectionId.end() ? nullptr : sections.findSection(secId->second), symb.global);
+            unsigned id = symbols.addSymbol(name, symb.value + offset, secId == sectionId.end() ? nullptr : sections.findSection(secId->second), symb.global);
             changedIds[symb.id] = id;
             delete name;
         }
@@ -93,7 +93,7 @@ void Linker::link(list<string> input_files)
         {
             r->symbol = changedIds[r->symbol];
             r->offset += offset;
-            if (r->type == RelocationTable::R_X86_64_PC16 && offset)
+            /* if (r->type == RelocationTable::R_X86_64_PC16 && offset)
             {
                 word val = 0;
                 SymbolTable::Symbol *symb = symbols.getSymbol(r->symbol);
@@ -104,7 +104,7 @@ void Linker::link(list<string> input_files)
                 val += offset;
                 sec->bytes[r->offset] = val & 0xff;
                 sec->bytes[r->offset] = val >> 8 & 0xff;
-            }
+            }*/
         }
         input.close();
     }
@@ -174,6 +174,10 @@ void Linker::place(const list<pair<unsigned, string>> &places)
         if (p.first < next_free_address)
             throw SyntaxError("Section ." + p.second + " is overlapping with section " + (prev ? prev->name : "??"));
 
+        if (p.first >= Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS && p.first < Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS + Emulator::MEMORY_MAPPED_REGISTERS_SIZE
+        || p.first + s->bytes.size() >= Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS && p.first + s->bytes.size() < Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS + Emulator::MEMORY_MAPPED_REGISTERS_SIZE)
+            throw SyntaxError("Section ." + p.second + " is overlapping with memory mapped registers");
+
         if (p.first + s->bytes.size() > Emulator::MEMORY_CAPACITY)
             throw SyntaxError("Section ." + p.second + " cannot fit in memory starting from the address " + Linker::unsigned2str(p.first));
 
@@ -221,7 +225,7 @@ unordered_map<unsigned, vector<byte> *> Linker::getAllSections()
                 break;
             case RelocationTable::R_X86_64_PC16:
                 number = sec->bytes[r.offset] & 0xff | sec->bytes[r.offset + 1] << 8;
-                number += symbol->section->start_address; // nzm treba li - sec->start_address ??;
+                number += symbol->section->start_address - sec->start_address;
                 sec->bytes[r.offset] = number & 0xff;
                 sec->bytes[r.offset + 1] = number >> 8 & 0xff;
                 break;
