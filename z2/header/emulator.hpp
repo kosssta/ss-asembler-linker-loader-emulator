@@ -27,7 +27,7 @@ public:
     static const unsigned IV_TABLE_NUM_ENTRIES = 8;
     static const unsigned IV_TABLE_ENTRY_SIZE = 2;
     static const unsigned NUM_REGISTERS = 16;
-    static const unsigned NUM_OPERATIONS = 24;
+    static const unsigned NUM_OPERATIONS = 25;
     static const unsigned SP_REG = 6;
     static const unsigned PC_REG = 7;
     static const unsigned PSW_REG = 15;
@@ -50,6 +50,9 @@ private:
     uword *pc = nullptr;
     uword *sp = nullptr;
     bool end = false;
+    bool timerInterrupt = false;
+    bool inputInterrupt = false;
+    bool outputInterrupt = false;
 
     word src;
     word dst;
@@ -64,6 +67,8 @@ private:
     void getDstOperand(unsigned size, bool jump = false);
     void writeDst(unsigned size);
     void updatePSW(word result, word flags);
+    void interrupt(unsigned entry);
+    void checkInterrupts();
 
     void halt();
     void iret();

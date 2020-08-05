@@ -7,6 +7,7 @@
 using namespace std;
 
 struct Section;
+class Linker;
 
 typedef int16_t word;
 
@@ -29,7 +30,9 @@ public:
     Symbol* getSymbol(unsigned id) const;
     bool isSection(string name) const;
     void checkUndefinedSymbols() const;
+    bool isDefined(Symbol *symbol) const;
 
+    friend class Linker;
 private:
     unordered_map<string, Symbol*> symbols;
     unsigned nextId = 1;

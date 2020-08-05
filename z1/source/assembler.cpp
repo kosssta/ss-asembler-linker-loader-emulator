@@ -128,6 +128,8 @@ void Assembler::processCommand(Instruction *instr)
     else if (instructionDetails.operand_size == -1)
         op_code |= 1 << 2;
 
+    unsigned op_size = instructionDetails.operand_size == -1 ? 2 : instructionDetails.operand_size;
+
     current_section->bytes.push_back(op_code);
 
     bool mem_addr = false;
@@ -171,7 +173,7 @@ void Assembler::processCommand(Instruction *instr)
             {
                 if (!instructionDetails.jump && mem_addr)
                     throw SyntaxError("Memory addressing allowed for one operand only");
-                processLiteralOrSymbol(operand, 2, instructionDetails.jump ? 0 : 4); // <literal> ili <simbol>
+                processLiteralOrSymbol(operand, instructionDetails.jump ? op_size : 2, instructionDetails.jump ? 0 : 4); // <literal> ili <simbol>
                 mem_addr = true;
             }
         }
@@ -427,9 +429,7 @@ void Assembler::processLiteralOrSymbol(string operand, unsigned size, byte op_co
         throw SyntaxError("Literals not allowed with pc relative addressing");
 
     SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
-    /*if (symb && !symb->defined)
-        symb->addFLink(current_section, current_section->bytes.size(), size);
-*/
+  
     if (symb && symb->global)
         number = 0;
 

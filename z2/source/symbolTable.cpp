@@ -10,7 +10,7 @@ unsigned SymbolTable::addSymbol(string name, word value, Section *section, bool 
         symbols[name] = new Symbol(name, value, section, global, nextId++);
         s = getSymbol(name);
     }
-    else if (s->global)
+    else if (s->global && global)
         throw MultipleDefinitionError(name);
 
     s->global |= global;
@@ -47,9 +47,13 @@ void SymbolTable::checkUndefinedSymbols() const
     string undefinedSymbols;
 
     for (auto s : symbols)
-        if (s.second->section == nullptr)
+        if (!isDefined(s.second))
             undefinedSymbols += (undefinedSymbols.empty() ? "" : ", ") + s.second->name;
 
     if (!undefinedSymbols.empty())
         throw SyntaxError("Undefined symbols: " + undefinedSymbols);
+}
+
+bool SymbolTable::isDefined(SymbolTable::Symbol *symbol) const {
+    return symbol && (symbol->name == "data_in" || symbol->name == "data_out" || symbol->name == "timer_cfg" || symbol->section);
 }

@@ -7,6 +7,15 @@
 #include <fstream>
 using namespace std;
 
+const pair<string, unsigned> Linker::interruptSectionNames[] = {{".int.init", 0}, {".int.invadd", 1}, {".int.timer", 2}, {".inv.term", 3}};
+
+Linker::Linker()
+{
+    symbols.addSymbol("data_out", 0xFF00, nullptr, true);
+    symbols.addSymbol("data_in", 0xFF02, nullptr, true);
+    symbols.addSymbol("timer_cfg", 0xFF10, nullptr, true);
+}
+
 void Linker::link(list<string> input_files)
 {
     struct BinarySymbol
@@ -64,7 +73,7 @@ void Linker::link(list<string> input_files)
             delete name;
 
             s = sections.addSection(s);
-            sectionId[s->id] = s->name;
+            sectionId[sb.id] = s->name;
             changedIds[sb.id] = s->id;
             offset = s->bytes.size();
             for (unsigned i = 0; i < sb.codeLength; ++i)
@@ -83,28 +92,23 @@ void Linker::link(list<string> input_files)
             char *name = new char[symb.nameLength + 1];
             name[symb.nameLength] = '\0';
             input.read(name, symb.nameLength * sizeof(name[0]));
-            auto secId = sectionId.find(changedIds[symb.section]);
+            auto secId = sectionId.find(symb.section);
             unsigned id = symbols.addSymbol(name, symb.value + offset, secId == sectionId.end() ? nullptr : sections.findSection(secId->second), symb.global);
             changedIds[symb.id] = id;
             delete name;
+        }
+
+        for (auto s : symbols.symbols)
+        {
+            SymbolTable::Symbol *symb = s.second;
+            if (symb->name[0] == '.')
+                symb->section->id = symb->id;
         }
 
         for (RelocationTable::Record *r : relocations)
         {
             r->symbol = changedIds[r->symbol];
             r->offset += offset;
-            /* if (r->type == RelocationTable::R_X86_64_PC16 && offset)
-            {
-                word val = 0;
-                SymbolTable::Symbol *symb = symbols.getSymbol(r->symbol);
-                if (!symbols.isSection(symb->name))
-                    continue;
-                Section *sec = symb->section;
-                val = sec->bytes[r->offset] | sec->bytes[r->offset + 1] << 8;
-                val += offset;
-                sec->bytes[r->offset] = val & 0xff;
-                sec->bytes[r->offset] = val >> 8 & 0xff;
-            }*/
         }
         input.close();
     }
@@ -125,7 +129,7 @@ void Linker::link(list<string> input_files)
                 number = sec->bytes[r.offset];
                 number += symbol->value * (r.plus ? 1 : -1);
                 sec->bytes[r.offset] = number & 0xff;
-                if (!symbols.isSection(symbol->name))
+                if (!symbols.isSection(symbol->name) && symbol->section)
                     r.symbol = symbol->section->id;
                 break;
             case RelocationTable::R_X86_64_16:
@@ -133,7 +137,7 @@ void Linker::link(list<string> input_files)
                 number += symbol->value * (r.plus ? 1 : -1);
                 sec->bytes[r.offset] = number & 0xff;
                 sec->bytes[r.offset + 1] = number >> 8 & 0xff;
-                if (!symbols.isSection(symbol->name))
+                if (!symbols.isSection(symbol->name) && symbol->section)
                     r.symbol = symbol->section->id;
                 break;
             case RelocationTable::R_X86_64_PC16:
@@ -143,7 +147,7 @@ void Linker::link(list<string> input_files)
                 sec->bytes[r.offset + 1] = number >> 8 & 0xff;
                 if (symbol->section->id == sec->id)
                     r.symbol = 0;
-                else if (!symbols.isSection(symbol->name))
+                else if (!symbols.isSection(symbol->name) && symbol->section)
                     r.symbol = symbol->section->id;
                 break;
             }
@@ -152,14 +156,56 @@ void Linker::link(list<string> input_files)
     }
 }
 
+void Linker::prepareIVT()
+{
+    for (pair<string, unsigned> p : interruptSectionNames)
+    {
+        string s = p.first;
+        Section *sec = sections.findSection(s);
+        if (sec && sections.findSection(".int." + p.second))
+            throw SyntaxError("Sections .int." + Linker::unsigned2str(p.second) + " and '" + p.first + "' cannot be both defined in the same program");
+        if (!sec)
+        {
+            sec = sections.addSection(new Section(s));
+            unsigned id = symbols.addSymbol(s, 0, sec, false);
+            sec->id = id;
+            SymbolTable::Symbol *symb = symbols.getSymbol(s);
+            if (s == ".int.invadd")
+                sec->bytes.push_back(0); // halt
+            else if (s == ".int.init")
+            {
+                sec->bytes.push_back(0b01100100); // mov $0, FF10
+                sec->bytes.push_back(0);
+                sec->bytes.push_back(0);
+                sec->bytes.push_back(0);
+                sec->bytes.push_back(0x80);
+                sec->bytes.push_back(0x10);
+                sec->bytes.push_back(0xff);
+                sec->bytes.push_back(2 << 3); // ret
+            }
+            else
+                sec->bytes.push_back(1); // iret
+        }
+    }
+
+    Section *sec = sections.findSection(".iv_table");
+    if (!sec)
+    {
+        sec = sections.addSection(new Section(".iv_table"));
+        unsigned id = symbols.addSymbol(".iv_table", 0, sec, false);
+        sec->id = id;
+        SymbolTable::Symbol *symb = symbols.getSymbol(".iv_table");
+        for (unsigned i = 0; i < Emulator::IV_TABLE_NUM_ENTRIES * Emulator::IV_TABLE_ENTRY_SIZE; ++i)
+            sec->bytes.push_back(0);
+    }
+}
+
 void Linker::place(const list<pair<unsigned, string>> &places)
 {
-    Section *iv_table = sections.addSection(new Section(".iv_table"));
+    prepareIVT();
+    Section *iv_table = sections.findSection(".iv_table");
     iv_table->start_address = 0;
-    symbols.addSymbol(".iv_table", 0, iv_table, false);
     next_free_address = Emulator::IV_TABLE_NUM_ENTRIES * Emulator::IV_TABLE_ENTRY_SIZE;
-    for (unsigned i = 0; i < next_free_address; ++i)
-        iv_table->bytes.push_back(0);
 
     Section *prev = iv_table;
     for (auto p : places)
@@ -169,13 +215,17 @@ void Linker::place(const list<pair<unsigned, string>> &places)
             throw SyntaxError("Section " + p.second + " does not exist");
 
         if (s->start_address != -1)
-            throw SyntaxError("Error: Found more -place attributes for section " + s->name);
+        {
+            if (s->start_address != p.first)
+                throw SyntaxError("Error: Found more -place attributes for section " + s->name);
+            else
+                continue;
+        }
 
         if (p.first < next_free_address)
             throw SyntaxError("Section ." + p.second + " is overlapping with section " + (prev ? prev->name : "??"));
 
-        if (p.first >= Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS && p.first < Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS + Emulator::MEMORY_MAPPED_REGISTERS_SIZE
-        || p.first + s->bytes.size() >= Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS && p.first + s->bytes.size() < Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS + Emulator::MEMORY_MAPPED_REGISTERS_SIZE)
+        if (p.first >= Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS && p.first < Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS + Emulator::MEMORY_MAPPED_REGISTERS_SIZE || p.first + s->bytes.size() >= Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS && p.first + s->bytes.size() < Emulator::MEMORY_MAPPED_REGISTERS_START_ADDRESS + Emulator::MEMORY_MAPPED_REGISTERS_SIZE)
             throw SyntaxError("Section ." + p.second + " is overlapping with memory mapped registers");
 
         if (p.first + s->bytes.size() > Emulator::MEMORY_CAPACITY)
@@ -185,6 +235,7 @@ void Linker::place(const list<pair<unsigned, string>> &places)
         next_free_address = s->start_address + s->bytes.size();
         prev = s;
     }
+
     for (auto s : sections.sections)
     {
         Section *sec = s.second;
@@ -194,6 +245,34 @@ void Linker::place(const list<pair<unsigned, string>> &places)
             next_free_address += sec->bytes.size();
             if (next_free_address > Emulator::MEMORY_CAPACITY)
                 throw SyntaxError("Section " + sec->name + " cannot fit in memory starting from address " + Linker::unsigned2str(sec->start_address));
+        }
+
+        bool found = false;
+        for (pair<string, unsigned> p : interruptSectionNames)
+            if (sec->name == p.first)
+            {
+                for (unsigned i = 0; i < Emulator::IV_TABLE_ENTRY_SIZE; ++i)
+                    iv_table->bytes[p.second * Emulator::IV_TABLE_ENTRY_SIZE + i] = sec->start_address >> 8 * i & 0xff;
+                found = true;
+                break;
+            }
+
+        if (!found && sec->name.length() > 5 && sec->name.substr(0, 5) == ".int.")
+        {
+            string entry = sec->name.substr(5);
+            if (entry > unsigned2str(8))
+                throw SyntaxError("IVT entry " + entry + " does not exist");
+            unsigned numb = 0;
+            for (unsigned i = 0; i < entry.length(); ++i)
+                if (entry[i] < 0 || entry[i] > 9)
+                    throw SyntaxError("IVT entry '" + entry + "' does not exist");
+                else
+                {
+                    numb *= 10;
+                    numb += entry[i] - '0';
+                }
+            for (unsigned i = 0; i < Emulator::IV_TABLE_ENTRY_SIZE; ++i)
+                iv_table->bytes[numb * Emulator::IV_TABLE_ENTRY_SIZE + i] = sec->start_address >> 8 * i & 0xff;
         }
     }
 }
@@ -208,7 +287,8 @@ unordered_map<unsigned, vector<byte> *> Linker::getAllSections()
         for (RelocationTable::Record &r : sec->relocationTable.records)
         {
             SymbolTable::Symbol *symbol = symbols.getSymbol(r.symbol);
-
+            if (!symbol->section)
+                continue;
             word number = 0;
             switch (r.type)
             {
