@@ -11,9 +11,9 @@ const pair<string, unsigned> Linker::interruptSectionNames[] = {{".int.init", 0}
 
 Linker::Linker()
 {
-    symbols.addSymbol("data_out", 0xFF00, nullptr, true);
-    symbols.addSymbol("data_in", 0xFF02, nullptr, true);
-    symbols.addSymbol("timer_cfg", 0xFF10, nullptr, true);
+    symbols.addSymbol("data_out", 0xFF00, nullptr, true, true);
+    symbols.addSymbol("data_in", 0xFF02, nullptr, true, true);
+    symbols.addSymbol("timer_cfg", 0xFF10, nullptr, true, true);
 }
 
 void Linker::link(list<string> input_files)
@@ -23,6 +23,7 @@ void Linker::link(list<string> input_files)
         unsigned nameLength;
         word value;
         unsigned section;
+        bool defined;
         bool global;
         unsigned id;
     };
@@ -93,7 +94,7 @@ void Linker::link(list<string> input_files)
             name[symb.nameLength] = '\0';
             input.read(name, symb.nameLength * sizeof(name[0]));
             auto secId = sectionId.find(symb.section);
-            unsigned id = symbols.addSymbol(name, symb.value + offset, secId == sectionId.end() ? nullptr : sections.findSection(secId->second), symb.global);
+            unsigned id = symbols.addSymbol(name, symb.value + offset, secId == sectionId.end() ? nullptr : sections.findSection(secId->second), symb.defined, symb.global);
             changedIds[symb.id] = id;
             delete name;
         }
@@ -167,7 +168,7 @@ void Linker::prepareIVT()
         if (!sec)
         {
             sec = sections.addSection(new Section(s));
-            unsigned id = symbols.addSymbol(s, 0, sec, false);
+            unsigned id = symbols.addSymbol(s, 0, sec, true, false);
             sec->id = id;
             SymbolTable::Symbol *symb = symbols.getSymbol(s);
             if (s == ".int.invadd")
@@ -192,7 +193,7 @@ void Linker::prepareIVT()
     if (!sec)
     {
         sec = sections.addSection(new Section(".iv_table"));
-        unsigned id = symbols.addSymbol(".iv_table", 0, sec, false);
+        unsigned id = symbols.addSymbol(".iv_table", 0, sec, true, false);
         sec->id = id;
         SymbolTable::Symbol *symb = symbols.getSymbol(".iv_table");
         for (unsigned i = 0; i < Emulator::IV_TABLE_NUM_ENTRIES * Emulator::IV_TABLE_ENTRY_SIZE; ++i)

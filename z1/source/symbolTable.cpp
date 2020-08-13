@@ -53,25 +53,23 @@ SymbolTable::Symbol *SymbolTable::getSymbol(string name) const
 void SymbolTable::setSymbolGlobal(string name)
 {
     Symbol *symb = getSymbol(name);
-    if (symb)
-        symb->global = true;
-    else
+    if (!symb)
     {
         symb = new Symbol();
         symb->name = name;
-        symb->global = true;
         symb->defined = false;
         symb->id = nextId++;
         symbols[name] = symb;
     }
 
+    symb->global = true;
     if (getExternSymbol(name))
         throw SyntaxError("Symbol " + name + " must be either global or extern, not both");
 }
 
 void SymbolTable::Symbol::clearFLink()
 {
-    if (global)
+    if (global && section)
     {
         flink.clear();
         return;
@@ -128,9 +126,12 @@ void SymbolTable::write(ofstream &output)
 
 void SymbolTable::insertExternSymbol(string name)
 {
+    if (getExternSymbol(name))
+        return;
     Symbol *s = getSymbol(name);
     if (s && s->global)
         throw SyntaxError("Symbol " + name + " must be either global or extern, not both");
+    setSymbolGlobal(name);
     externSymbols[name] = name;
 }
 
@@ -205,6 +206,7 @@ unsigned SymbolTable::writeBinary(ofstream &output)
         unsigned nameLength;
         word value;
         unsigned section;
+        bool defined;
         bool global;
         unsigned id;
     };
@@ -215,6 +217,7 @@ unsigned SymbolTable::writeBinary(ofstream &output)
         bs.nameLength = s.name.size();
         bs.value = s.value;
         bs.section = s.section ? s.section->id : 0;
+        bs.defined = s.defined;
         bs.global = s.global;
         bs.id = s.id;
         output.write((char *)&bs, sizeof(bs));

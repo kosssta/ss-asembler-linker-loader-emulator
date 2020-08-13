@@ -218,15 +218,42 @@ void Assembler::processDirective(Instruction *instr)
 
     if (instr->operation == "section" || instr->operation == "text" || instr->operation == "data" || instr->operation == "bss" || instr->operation == "rodata")
     {
-        if (instr->op2 != "" || instr->operation != "section" && instr->op1 != "")
+        if (instr->operation == "section" && instr->op1 == "")
             throw SyntaxError();
 
-        string name = instr->op1 != "" ? instr->op1.substr(1) : instr->operation;
-        current_section = new Section("." + name);
+        string name;
+        string rights = "";
+        if (instr->operation == "section")
+        {
+            name = instr->op1;
+            rights = instr->op2;
+        }
+        else
+        {
+            name = "." + instr->operation;
+            rights = instr->op1 + (instr->op2 != "" ? "," + instr->op2 : "");
+        }
+
+        if (name[0] != '.')
+            throw SyntaxError("Names of sections must start with .");
+
+        if (rights == "")
+        {
+            if (name == ".text")
+                rights = "r,w,x,p";
+            else if (name == ".data")
+                rights = "r,w,p";
+            else if (name == ".bss")
+                rights = "r,w";
+            else if (name == ".rodata")
+                rights = "r,p";
+        }
+
+        current_section = new Section(name, rights);
         Section *ret = sectionTable.addSection(name, current_section);
         if (current_section == ret)
         {
-            unsigned id = symbolTable.insertSymbol('.' + name, true, 0, current_section);
+            unsigned id = symbolTable.insertSymbol(name, true, 0, current_section);
             current_section->id = id;
         }
         else
@@ -294,12 +321,10 @@ void Assembler::processDirective(Instruction *instr)
         if (number < 0)
             throw SyntaxError("Operand cannot be negative");
 
-        byte *arr = new byte[number];
         for (unsigned i = 0; i < number; ++i)
         {
-            current_section->bytes.push_back(arr[i]);
+            current_section->bytes.push_back(0);
         }
-        delete arr;
     }
     else if (instr->operation == "equ")
     {
@@ -309,7 +334,7 @@ void Assembler::processDirective(Instruction *instr)
         if (Assembler::isLiteral(instr->op1))
             throw SyntaxError();
 
-        uncalculatedSymbols.add(instr->op1, instr->op2, current_section);
+        uncalculatedSymbols.add(instr->op1, instr->op2);
     }
     else
         throw UnrecognizedSymbol(instr->operation);
@@ -429,8 +454,8 @@ void Assembler::processLiteralOrSymbol(string operand, unsigned size, byte op_co
         throw SyntaxError("Literals not allowed with pc relative addressing");
 
     SymbolTable::Symbol *symb = symbolTable.getSymbol(operand);
-  
-    if (symb && symb->global)
+
+    if (symb && symb->global && symb->section)
         number = 0;
 
     if (pc_rel)

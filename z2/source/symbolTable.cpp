@@ -2,19 +2,20 @@
 #include "../header/syntaxErrors.hpp"
 #include "../header/section.hpp"
 
-unsigned SymbolTable::addSymbol(string name, word value, Section *section, bool global)
+unsigned SymbolTable::addSymbol(string name, word value, Section *section, bool defined, bool global)
 {
     Symbol *s = getSymbol(name);
     if (!s)
     {
-        symbols[name] = new Symbol(name, value, section, global, nextId++);
+        symbols[name] = new Symbol(name, value, section, defined, global, nextId++);
         s = getSymbol(name);
     }
-    else if (s->global && global)
+    else if (s->defined && defined && global)
         throw MultipleDefinitionError(name);
 
+    s->defined |= defined;
     s->global |= global;
-    if (global)
+    if (defined)
     {
         s->section = section;
         s->value = value;

@@ -102,13 +102,26 @@ void RelocationTable::replace()
 bool RelocationTable::operator()(const RelocationTable::Record &r)
 {
     SymbolTable::Symbol *symb = symbTable->getSymbol(r.name);
-    if (r.type == R_X86_64_PC16 && !symb->global && symb->section == r.section)
+    if (symb && symb->defined && !symb->section)
     {
-        word number = r.section->bytes[r.offset] | r.section->bytes[r.offset + 1] << 8;
-        number -= r.offset;
-        r.section->bytes[r.offset] = number & 0xff;
-        r.section->bytes[r.offset + 1] = number >> 8 & 0xff;
-        return true;
+        switch (r.type)
+        {
+        case R_X86_64_PC16:
+            if (!symb->global && symb->section == r.section)
+            {
+                word number = r.section->bytes[r.offset] & 0xff | r.section->bytes[r.offset + 1] << 8;
+                number -= r.offset;
+                r.section->bytes[r.offset] = number & 0xff;
+                r.section->bytes[r.offset + 1] = number >> 8 & 0xff;
+                return true;
+            }
+            break;
+        case R_X86_64_16:
+            r.section->bytes[r.offset + 1] = symb->value >> 8 & 0xff;
+        case R_X86_64_8:
+            r.section->bytes[r.offset] = symb->value & 0xff;
+            return true;
+        }
     }
     return !symb;
 }

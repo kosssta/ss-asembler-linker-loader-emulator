@@ -18,7 +18,7 @@ Section *SectionTable::addSection(string name, Section *section)
 
 Section *SectionTable::findSection(string name) const
 {
-    auto ret = sections.find(name.substr(1));
+    auto ret = sections.find(name);
     return ret == sections.end() ? nullptr : ret->second;
 }
 
@@ -41,7 +41,7 @@ void SectionTable::write(ofstream &output) const
     secs.sort();
     for (Section &s : secs)
     {
-        output << s.name << ':' << endl;
+        output << s.name << " (" << s.getAccessRights() << "):" << endl;
         output << "Length = " << s.bytes.size() << endl;
         for (byte b : s.bytes)
         {

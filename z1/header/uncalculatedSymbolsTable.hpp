@@ -32,7 +32,7 @@ public:
 
     UncalculatedSymbolsTable(SymbolTable *symbTable, RelocationTable *relTable) : symbTable(symbTable), relTable(relTable) {}
     ~UncalculatedSymbolsTable();
-    void add(string name, string expression, Section *section = nullptr);
+    void add(string name, string expression);
     Symbol *get(string name);
     void write(ofstream& output) const;
     bool calculateAll();

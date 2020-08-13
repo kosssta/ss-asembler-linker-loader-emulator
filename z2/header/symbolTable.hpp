@@ -19,13 +19,14 @@ public:
         string name;
         word value;
         Section *section = nullptr;
+        bool defined;
         bool global;
         unsigned id;
 
-        Symbol(string name, word value, Section *section, bool global, unsigned id) : name(name), value(value), section(section), global(global), id(id) {}
+        Symbol(string name, word value, Section *section, bool defined, bool global, unsigned id) : name(name), value(value), section(section), defined(defined), global(global), id(id) {}
     };
 
-    unsigned addSymbol(string name, word value, Section *section, bool global);
+    unsigned addSymbol(string name, word value, Section *section, bool defined, bool global);
     Symbol* getSymbol(string name) const;
     Symbol* getSymbol(unsigned id) const;
     bool isSection(string name) const;

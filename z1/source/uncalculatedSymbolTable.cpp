@@ -104,7 +104,7 @@ word UncalculatedSymbolsTable::Symbol::parseOperand(string operand, SymbolTable 
     return number;
 }
 
-void UncalculatedSymbolsTable::add(string name, string expression, Section *section)
+void UncalculatedSymbolsTable::add(string name, string expression)
 {
     if (get(name))
         throw SymbolRedefinitionError(name);
@@ -112,9 +112,9 @@ void UncalculatedSymbolsTable::add(string name, string expression, Section *sect
     Symbol *symbol = new Symbol(name, expression);
     bool calculated = symbol->calculateValue(symbTable, relTable);
 
-    symbTable->insertSymbol(name, calculated, symbol->value, section);
+    symbTable->insertSymbol(name, calculated, symbol->value);
     auto symb = symbTable->getSymbol(name);
-    symb->section = section;
+    symb->section = nullptr;
     
     symbols[name] = symbol;
 }
