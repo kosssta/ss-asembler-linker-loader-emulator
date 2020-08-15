@@ -9,7 +9,7 @@ using namespace std;
 
 Operation Emulator::operations[] = {&Emulator::halt, &Emulator::iret, &Emulator::ret, &Emulator::Int, &Emulator::call, &Emulator::jmp, &Emulator::jeq, &Emulator::jne, &Emulator::jgt, &Emulator::push, &Emulator::pop, &Emulator::xchg, &Emulator::mov, &Emulator::add, &Emulator::sub, &Emulator::mul, &Emulator::div, &Emulator::cmp, &Emulator::Not, &Emulator::And, &Emulator::Or, &Emulator::Xor, &Emulator::test, &Emulator::shl, &Emulator::shr};
 
-Emulator::Emulator(char *input_files[], unsigned cnt)
+Emulator::Emulator(char *input_files[], unsigned cnt) : terminalOutput(1)
 {
     for (unsigned i = 0; i < cnt; ++i)
     {
@@ -25,6 +25,11 @@ Emulator::Emulator(char *input_files[], unsigned cnt)
             this->input_files.push_back(file);
     }
     places.sort();
+}
+
+Emulator::~Emulator()
+{
+    cleanEmulation();
 }
 
 unsigned Emulator::parseInt(string arg)
@@ -66,9 +71,6 @@ void Emulator::emulate()
 {
     prepareEmulation();
 
-    Timer timer((uword*) (memory + 0xff10), &timerInterrupt);
-    Terminal terminal((uword *) (memory + 0xff02), (uword *) (memory + 0xff00), &inputInterrupt, &outputInterrupt);
-
     while (!end)
     {
         unsigned char op_code = memory[PC] >> 3 & 0x1f;
@@ -79,12 +81,10 @@ void Emulator::emulate()
             ++PC;
             interrupt(1);
         }
-        checkInterrupts();
+        if (op_code != 1)
+            checkInterrupts();
     }
 
-    timer.terminate();
-    terminal.terminate();
-    
     cleanEmulation();
 }
 
@@ -111,6 +111,9 @@ void Emulator::prepareEmulation()
     memory[--SP] = PC >> 8 & 0xff;
     memory[--SP] = PC & 0xff;
     PC = memory[0] & 0xff | memory[1] << 8;
+
+    timer = new Timer((uword *)(memory + 0xff10), &timerInterrupt);
+    terminal = new Terminal((uword *)(memory + 0xff02), (uword *)(memory + 0xff00), &terminalInterrupt, &terminalOutput);
 }
 
 void Emulator::cleanEmulation()
@@ -120,6 +123,14 @@ void Emulator::cleanEmulation()
     delete registers;
     registers = nullptr;
     pc = sp = nullptr;
+    if (timer)
+        timer->terminate();
+    if (terminal)
+        terminal->terminate();
+    delete timer;
+    delete terminal;
+    timer = nullptr;
+    terminal = nullptr;
 }
 
 unsigned Emulator::getOperandsSize()
@@ -278,9 +289,13 @@ void Emulator::writeDst(unsigned size)
 {
     if (memAdr)
     {
+        if (dstAddress == 0xFF00)
+            terminalOutput.acquire();
         memory[dstAddress] = dst & 0xff;
         if (size == 2)
             memory[(dstAddress + 1) % MEMORY_CAPACITY] = dst >> 8 & 0xff;
+        if (dstAddress == 0xFF00)
+            terminal->waitForChar.release();
     }
     else
     {
@@ -288,8 +303,8 @@ void Emulator::writeDst(unsigned size)
             registers[dstAddress] = dst;
         else
         {
-            registers[dstAddress] &= reg_h ? 0x00ff : 0xff00;
-            registers[dstAddress] |= dst << 8 * reg_h & 0xff;
+            registers[dstAddress] &= reg_h ? 0xff00 : 0x00ff;
+            registers[dstAddress] |= dst << 8 * reg_h & (reg_h ? 0xff00 : 0x00ff);
         }
     }
 }
@@ -312,11 +327,25 @@ void Emulator::interrupt(unsigned entry)
     memory[--SP] = PC & 0xff;
     memory[--SP] = PSW >> 8 & 0xff;
     memory[--SP] = PSW & 0xff;
-    PC |= memory[entry % 8 << 1] & 0xff | memory[(entry % 8 << 1) + 1] << 8;
+    PSW |= PSW_I;
+    PC = memory[entry % 8 << 1] & 0xff | memory[(entry % 8 << 1) + 1] << 8;
 }
 
-void Emulator::checkInterrupts() {
+void Emulator::checkInterrupts()
+{
+    if (PSW & PSW_I)
+        return;
 
+    if (!(PSW & PSW_Tr) && timerInterrupt)
+    {
+        interrupt(2);
+        timerInterrupt = false;
+    }
+    else if (!(PSW & PSW_Tl) && terminalInterrupt)
+    {
+        interrupt(3);
+        terminalInterrupt = false;
+    }
 }
 
 void Emulator::halt()
@@ -328,7 +357,7 @@ void Emulator::halt()
 void Emulator::iret()
 {
     ++PC;
-    cout << "iret" << endl;
+    //  cout << "iret" << endl;
     PC = 0;
     PSW = 0;
     PSW |= memory[SP++] & 0xff;
@@ -365,35 +394,33 @@ void Emulator::jmp()
 {
     unsigned op_size = getOperandsSize();
     getDstOperand(op_size, true);
-    cout << "jmp " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
-    PC = dst;
+    // cout << hex << "jmp " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
+    PC = dstAddress;
 }
 
 void Emulator::jeq()
 {
     unsigned op_size = getOperandsSize();
     getDstOperand(op_size, true);
-    cout << "jeq " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
     if (PSW & PSW_Z)
-        PC = dst;
+        PC = dstAddress;
 }
 
 void Emulator::jne()
 {
     unsigned op_size = getOperandsSize();
     getDstOperand(op_size, true);
-    cout << "jne " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
     if (!(PSW & PSW_Z))
-        PC = dst;
+        PC = dstAddress;
 }
 
 void Emulator::jgt()
 {
     unsigned op_size = getOperandsSize();
     getDstOperand(op_size, true);
-    cout << "jeq " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
+    // cout << "jgt " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
     if (PSW & PSW_Z || PSW & PSW_N ^ PSW & PSW_O)
-        PC = dst;
+        PC = dstAddress;
 }
 
 void Emulator::push()
@@ -443,7 +470,7 @@ void Emulator::mov()
     unsigned op_size = getOperandsSize();
     getSrcOperand(op_size);
     getDstOperand(op_size);
-    cout << "mov 0x" << hex << src << ' ' << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
+    // cout << "mov 0x" << hex << src << ' ' << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
     dst = src;
     writeDst(op_size);
     updatePSW(dst, PSW_Z | PSW_N);
@@ -454,7 +481,7 @@ void Emulator::add()
     unsigned op_size = getOperandsSize();
     getSrcOperand(op_size);
     getDstOperand(op_size);
-    cout << "add 0x" << hex << src << ' ' << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
+    //  cout << "add 0x" << hex << src << ' ' << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
     updatePSW(dst + src, PSW_Z | PSW_N | PSW_O);
     if ((int)src + (int)dst != (int)(src + dst))
         PSW |= PSW_C;
@@ -496,7 +523,8 @@ void Emulator::div()
     getSrcOperand(op_size);
     getDstOperand(op_size);
     cout << "div 0x" << hex << src << ' ' << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
-    if (src == 0) {
+    if (src == 0)
+    {
         interrupt(1);
         return;
     }
@@ -509,10 +537,11 @@ void Emulator::cmp()
 {
     unsigned op_size = getOperandsSize();
     getSrcOperand(op_size);
-    getDstOperand(op_size);
-    cout << "cmp 0x" << hex << src << ' ' << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
-    updatePSW(dst - src, PSW_Z | PSW_N | PSW_O);
-    if ((int)dst - (int)src != (int)(dst - src))
+    word s = src;
+    getSrcOperand(op_size);
+    // cout << "cmp 0x" << hex << s << ' ' << src << endl;
+    updatePSW(src - s, PSW_Z | PSW_N | PSW_O);
+    if ((int)src - (int)s != (int)(src - s))
         PSW |= PSW_C;
     else
         PSW &= ~PSW_C;

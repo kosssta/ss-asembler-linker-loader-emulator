@@ -31,7 +31,7 @@ void Timer::timer_func()
 void Timer::terminate()
 {
     end = true;
-    timer->join();
+  //  timer->join();
     delete timer;
     timer = nullptr;
 }

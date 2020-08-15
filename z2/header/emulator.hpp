@@ -1,6 +1,7 @@
 #ifndef EMULATOR_H_
 #define EMULATOR_H_
 
+#include "../header/semaphore.hpp"
 #include <string>
 #include <list>
 #include <utility>
@@ -11,6 +12,8 @@ using namespace std;
 #define PSW (registers[PSW_REG])
 
 class Emulator;
+class Timer;
+class Terminal;
 
 typedef int8_t byte;
 typedef int16_t word;
@@ -34,9 +37,10 @@ public:
     static Operation operations[];
 
     enum ADDRESSING {IMM, REG_DIR, REG_IND, REG_IND_DISP, MEM_DIR};
-    enum FLAGS {PSW_Z, PSW_O = 2, PSW_C = 4, PSW_N = 8, PSW_Tr = 0x2000, PSW_Tl = 0x4000, PSW_I = 0x8000};
+    enum FLAGS {PSW_Z = 1, PSW_O = 2, PSW_C = 4, PSW_N = 8, PSW_Tr = 0x2000, PSW_Tl = 0x4000, PSW_I = 0x8000};
 
     Emulator(char *input_files[], unsigned cnt);
+    ~Emulator();
     void emulate();
 
     static unsigned parseInt(string number);
@@ -50,9 +54,11 @@ private:
     uword *pc = nullptr;
     uword *sp = nullptr;
     bool end = false;
+    Timer *timer = nullptr;
+    Terminal *terminal = nullptr;
     bool timerInterrupt = false;
-    bool inputInterrupt = false;
-    bool outputInterrupt = false;
+    bool terminalInterrupt = false;
+    Semaphore terminalOutput;
 
     word src;
     word dst;

@@ -162,7 +162,7 @@ void Assembler::processCommand(Instruction *instr)
             }
             else if (!instructionDetails.jump && operand[0] == '$')
             {
-                if (instructionDetails.num_operands == 1 && instructionDetails.operation_code != 9 || instructionDetails.num_operands == 2 && (instructionDetails.operation_code == 24 && i == 0 || instructionDetails.operation_code != 24 && i == 1))
+                if (instructionDetails.num_operands == 1 && instructionDetails.operation_code != 9 || instructionDetails.num_operands == 2 && (instructionDetails.operation_code == 24 && i == 0 || (instructionDetails.operation_code != 24 && instructionDetails.operation_code != 17) && i == 1))
                     throw SyntaxError("Immediate addressing is not allowed for the destination operand");
 
                 processLiteralOrSymbol(operand.substr(1), 2); // $<literal> ili $<simbol>

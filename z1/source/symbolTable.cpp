@@ -104,7 +104,7 @@ void SymbolTable::write(ofstream &output)
         return;
     }
 
-    output << left << setw(10) << setfill(' ') << "Name";
+    output << left << setw(11) << setfill(' ') << "Name";
     output << left << setw(8) << setfill(' ') << "Value";
     output << left << setw(8) << setfill(' ') << "Section";
     output << left << setw(9) << setfill(' ') << "Defined";
@@ -114,7 +114,7 @@ void SymbolTable::write(ofstream &output)
 
     for (auto &s : symbols)
     {
-        output << left << setw(10) << setfill(' ') << s.name;
+        output << left << setw(11) << setfill(' ') << s.name;
         output << left << setw(8) << setfill(' ') << s.value;
         output << left << setw(8) << setfill(' ') << (s.section ? s.section->id : 0);
         output << left << setw(9) << setfill(' ') << (s.defined ? "true" : "false");

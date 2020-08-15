@@ -7,7 +7,7 @@
 #include <fstream>
 using namespace std;
 
-const pair<string, unsigned> Linker::interruptSectionNames[] = {{".int.init", 0}, {".int.invadd", 1}, {".int.timer", 2}, {".inv.term", 3}};
+const pair<string, unsigned> Linker::interruptSectionNames[] = {{".int.init", 0}, {".int.invadd", 1}, {".int.timer", 2}, {".int.term", 3}};
 
 Linker::Linker()
 {
