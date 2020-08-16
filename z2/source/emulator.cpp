@@ -236,10 +236,11 @@ void Emulator::getDstOperand(unsigned size, bool jump)
             interrupt(1);
             return;
         }
-        dst |= size == 2 ? registers[reg] : registers[reg] >> 8 * (next & 1) & 0xff;
+
+        reg_h = next & 1;
+        dst |= size == 2 ? registers[reg] : registers[reg] >> 8 * reg_h & (reg_h ? 0xff00 : 0x00ff);
         dstAddress = reg;
         memAdr = false;
-        reg_h = next & 1;
     }
     break;
 
@@ -265,6 +266,8 @@ void Emulator::getDstOperand(unsigned size, bool jump)
             dst |= ((memory[registers[reg]] + disp + 1) % MEMORY_CAPACITY) << 8;
         dstAddress = registers[reg] + disp;
         memAdr = true;
+        if (jump && reg == PC_REG)
+            dst = dstAddress;
     }
     break;
 
@@ -356,8 +359,6 @@ void Emulator::halt()
 
 void Emulator::iret()
 {
-    ++PC;
-    //  cout << "iret" << endl;
     PC = 0;
     PSW = 0;
     PSW |= memory[SP++] & 0xff;
@@ -395,7 +396,7 @@ void Emulator::jmp()
     unsigned op_size = getOperandsSize();
     getDstOperand(op_size, true);
     // cout << hex << "jmp " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
-    PC = dstAddress;
+    PC = dst;
 }
 
 void Emulator::jeq()
@@ -403,7 +404,7 @@ void Emulator::jeq()
     unsigned op_size = getOperandsSize();
     getDstOperand(op_size, true);
     if (PSW & PSW_Z)
-        PC = dstAddress;
+        PC = dst;
 }
 
 void Emulator::jne()
@@ -411,7 +412,7 @@ void Emulator::jne()
     unsigned op_size = getOperandsSize();
     getDstOperand(op_size, true);
     if (!(PSW & PSW_Z))
-        PC = dstAddress;
+        PC = dst;
 }
 
 void Emulator::jgt()
@@ -420,7 +421,7 @@ void Emulator::jgt()
     getDstOperand(op_size, true);
     // cout << "jgt " << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
     if (PSW & PSW_Z || PSW & PSW_N ^ PSW & PSW_O)
-        PC = dstAddress;
+        PC = dst;
 }
 
 void Emulator::push()
@@ -496,7 +497,6 @@ void Emulator::sub()
     unsigned op_size = getOperandsSize();
     getSrcOperand(op_size);
     getDstOperand(op_size);
-    cout << "sub 0x" << hex << src << ' ' << (memAdr ? "mem[" : "reg[") << dstAddress << ']' << endl;
     updatePSW(dst - src, PSW_Z | PSW_N | PSW_O);
     if ((int)dst - (int)src != (int)(dst - src))
         PSW |= PSW_C;
