@@ -14,6 +14,7 @@ public:
     Terminal(uword *input, uword *output, bool *interrupt, Semaphore *outputDone);
     ~Terminal();
 
+    static char getch();
     void input_func();
     void output_func();
     void terminate();

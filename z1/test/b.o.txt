@@ -1,0 +1,30 @@
+=== Symbol table ===
+Name       Value   Section Defined  Global   Id      
+.text      0       1       true     false    1       
+.data      0       2       true     false    2       
+data_out   0       0       false    true     3       
+main       0       1       true     true     4       
+C          51      2       true     true     5       
+
+=== Sections ===
+.text (RWXP):
+Length = b
+64 00 00 00 20 64 20 80 00 00 00 
+
+.data (RWP):
+Length = 5
+05 00 00 01 00 
+
+.rel.text
+Length = 2
+Id        Offset  Type           Plus 
+3         2       R_X86_64_16    +    
+3         8       R_X86_64_16    +    
+
+.rel.data
+Length = 2
+Id        Offset  Type           Plus 
+3         1       R_X86_64_16    +    
+2         3       R_X86_64_16    +    
+
+

@@ -154,15 +154,7 @@ void UncalculatedSymbolsTable::calculateAll()
 UncalculatedSymbolsTable::~UncalculatedSymbolsTable()
 {
     for (auto s : symbols)
-    {
-        cout << "Symbol " + s.first << endl;
-        for (auto ind : s.second->index.index)
-        {
-            cout << (ind.first ? ind.first->name : "UND") << ' ' << ind.second << endl;
-        }
-        cout << endl;
         delete s.second;
-    }
 }
 
 void UncalculatedSymbolsTable::RelocationIndex::add(Section *section, bool plus)

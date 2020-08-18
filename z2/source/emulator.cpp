@@ -353,6 +353,7 @@ void Emulator::checkInterrupts()
 
 void Emulator::halt()
 {
+    terminalOutput.acquire();
     cout << "halt" << endl;
     end = true;
 }

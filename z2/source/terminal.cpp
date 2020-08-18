@@ -20,12 +20,12 @@ Terminal::~Terminal()
         terminate();
 }
 
-char getch()
+char Terminal::getch()
 {
     char buf = 0;
     struct termios old = {0};
     if (tcgetattr(0, &old) < 0)
-        perror("tcsetattr()");
+    perror("tcsetattr()");
     old.c_lflag &= ~ICANON;
     old.c_lflag &= ~ECHO;
     old.c_cc[VMIN] = 1;
@@ -69,8 +69,9 @@ void Terminal::terminate()
 {
     end = true;
     waitForChar.release();
-    //  terminal_input->join();
-    // terminal_output->join();
+    cout << "\nPress any key to continue..." << endl;
+    terminal_input->join();
+    terminal_output->join();
     delete terminal_input;
     delete terminal_output;
     terminal_input = nullptr;

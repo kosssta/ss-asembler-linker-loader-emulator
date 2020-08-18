@@ -1,0 +1,47 @@
+=== Symbol table ===
+Name       Value   Section Defined  Global   Id      
+.text      0       1       true     false    1       
+.data      0       2       true     false    2       
+.int.timer 0       3       true     false    3       
+.int.term  0       4       true     false    4       
+data_out   0       0       false    true     5       
+data_in    0       0       false    true     6       
+timer_cfg  0       0       false    true     7       
+main       0       1       true     true     8       
+
+=== Sections ===
+.text (RWXP):
+Length = a
+8C 22 00 01 00 3C 6E F7 FF 00 
+
+.data (RWP):
+Length = 2
+30 00 
+
+.int.timer (R):
+Length = 23
+64 80 00 00 20 64 20 80 00 00 6C 00 01 00 20 8C 00 39 00 20 44 6E 05 00 64 00 30 00 20 64 20 80 00 00 08 
+
+.int.term (R):
+Length = 52
+64 80 00 00 20 8C 20 00 71 00 3C 6E 09 00 64 00 01 00 22 2C 00 51 00 8C 20 00 66 00 3C 6E 16 00 8C 80 00 00 00 00 00 34 6E 26 00 74 00 01 00 80 00 00 2C 00 51 00 8C 20 00 73 00 3C 6E 12 00 8C 80 00 00 00 07 00 34 6E 07 00 6C 00 01 00 80 00 00 08 
+
+.rel.int.timer
+Length = 3
+Id        Offset  Type           Plus 
+2         2       R_X86_64_16    +    
+5         8       R_X86_64_16    +    
+2         20      R_X86_64_16    +    
+
+.rel.int.term
+Length = 7
+Id        Offset  Type           Plus 
+6         2       R_X86_64_16    +    
+4         15      R_X86_64_16    +    
+7         22      R_X86_64_16    +    
+7         30      R_X86_64_16    +    
+4         34      R_X86_64_16    +    
+7         41      R_X86_64_16    +    
+7         4f      R_X86_64_16    +    
+
+

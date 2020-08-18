@@ -2,7 +2,7 @@
 #include <chrono>
 using namespace std;
 
-const unsigned Timer::INTERVALS[] = {500, 1000, 1500, 2000, 5000, 10000, 30000, 60000};
+const unsigned Timer::INTERVALS[] = {1, 2, 3, 4, 10, 20, 60, 120};
 
 Timer::Timer(uword *interval, bool *interrupt)
 {
@@ -21,9 +21,12 @@ void Timer::timer_func()
 {
     while (true)
     {
-        this_thread::sleep_for(chrono::milliseconds(INTERVALS[*interval]));
-        if (end)
-            break;
+        for (unsigned i = 0; i < INTERVALS[*interval]; ++i)
+        {
+            this_thread::sleep_for(chrono::milliseconds(500));
+            if (end)
+                return;
+        }
         *interrupt = true;
     }
 }
@@ -31,7 +34,7 @@ void Timer::timer_func()
 void Timer::terminate()
 {
     end = true;
-  //  timer->join();
+    timer->join();
     delete timer;
     timer = nullptr;
 }

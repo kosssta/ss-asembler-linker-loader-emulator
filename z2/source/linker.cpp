@@ -119,9 +119,36 @@ void Linker::link(list<string> input_files)
     for (auto s : sections.sections)
     {
         Section *sec = s.second;
+        unordered_map<string, int> relocationIndex;
+        unsigned prev_offset = 0;
         for (RelocationTable::Record &r : sec->relocationTable.records)
         {
             SymbolTable::Symbol *symbol = symbols.getSymbol(r.symbol);
+
+            if (r.offset == prev_offset)
+            {
+                SymbolTable::Symbol *symb = symbols.getSymbol(r.symbol);
+                if (symb->section)
+                {
+                    if (relocationIndex.find(symb->section->name) != relocationIndex.end())
+                        relocationIndex[symb->section->name] = 0;
+                    relocationIndex[symb->section->name] += r.plus ? 1 : -1;
+                }
+            }
+            else
+            {
+                bool section = false;
+                for (auto r : relocationIndex)
+                {
+                    if (r.second != 0)
+                        if (r.second == 1 && !section)
+                            section = true;
+                        else
+                            throw SyntaxError("Incorrect expression for symbol " + symbols.getSymbol(r.first)->name);
+                }
+                relocationIndex.clear();
+                prev_offset = r.offset;
+            }
 
             word number = 0;
             switch (r.type)
