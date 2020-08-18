@@ -57,24 +57,8 @@ void RelocationTable::write(ofstream &output, SectionTable *sections)
 
 void RelocationTable::add(unordered_map<string, UncalculatedSymbolsTable::Symbol *> symbols)
 {
-    // forward_list<Record> tmp;
     forward_list<Record> to_remove;
-    /*
-    for (auto sym : symbols)
-    {
-        auto *s = sym.second;
-        for (Record r : records)
-        {
-            if (r.name == s->name)
-            {
-                for (string s : s->symbols)
-                    tmp.push_front(Record(s.substr(1), r.section, r.offset, R_X86_64_16, s[0] == '+'));
-                to_remove.push_front(r);
-            }
-        }
-    }
-*/
-
+    
     for (Record r : records)
     {
         auto s = symbols.find(r.name);
@@ -100,18 +84,12 @@ void RelocationTable::add(unordered_map<string, UncalculatedSymbolsTable::Symbol
 
         to_remove.push_front(r);
 
-        if (symbol->defined && symbol->section)
-            records.push_front(Record(symbol->global ? symbol->name : symbol->section->name, r.section, r.offset, r.type, r.plus));
-
         for (auto s : usymbol->symbols)
             records.push_front(Record(s.second, r.section, r.offset, r.type, !(s.first ^ r.plus)));
     }
     for (Record r : to_remove)
         records.remove(r);
     to_remove.clear();
-
-    //  for (Record r : tmp)
-    //    records.push_front(r);
 }
 
 void RelocationTable::replace()

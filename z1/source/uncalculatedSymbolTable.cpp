@@ -147,6 +147,8 @@ void UncalculatedSymbolsTable::calculateAll()
         SymbolTable:: Symbol *symb = symbTable->getSymbol(s.second->name);
         symb->defined = true;
     }
+    
+    relTable->add(symbols);
 }
 
 UncalculatedSymbolsTable::~UncalculatedSymbolsTable()
