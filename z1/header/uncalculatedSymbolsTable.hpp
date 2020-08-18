@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <unordered_map>
 #include <list>
-#include <fstream>
 #include <iostream>
 #include <utility>
 using namespace std;
@@ -28,16 +27,12 @@ public:
     struct Symbol
     {
         string name;
-        string expression;
-        bool extern_ = false;
-        word value;
-        bool defined = false;
         RelocationIndex index;
         list<pair<bool, string>> symbols;
 
-        Symbol(string name, string expression);
-        bool calculateValue(UncalculatedSymbolsTable *uTable, SymbolTable *symbTable, RelocationTable *relTable);
-        word parseOperand(string operand, SymbolTable *symbTable, RelocationTable *relTable, bool minusSign, bool *status = nullptr);
+        Symbol(string name, string expression, SymbolTable *symbTable);
+        void calculateValue(UncalculatedSymbolsTable *uTable, SymbolTable *symbTable, RelocationTable *relTable);
+        bool parseOperand(string operand, SymbolTable *symbTable, bool minusSign);
         void checkIndex(SymbolTable *symbTable);
     };
 
@@ -45,8 +40,7 @@ public:
     ~UncalculatedSymbolsTable();
     void add(string name, string expression);
     Symbol *get(string name);
-    void write(ofstream &output) const;
-    bool calculateAll();
+    void calculateAll();
 
 private:
     SymbolTable *symbTable;

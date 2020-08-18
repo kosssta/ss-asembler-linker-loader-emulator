@@ -2,22 +2,41 @@
 #include "../header/assembler.hpp"
 #include "../header/section.hpp"
 #include "../header/syntaxErrors.hpp"
-#include <iomanip>
+#include <set>
 using namespace std;
 
-UncalculatedSymbolsTable::Symbol::Symbol(string name, string expression) : name(name), expression(expression), value(0)
+UncalculatedSymbolsTable::Symbol::Symbol(string name, string expression, SymbolTable *symbTable) : name(name)
 {
     list<string> elems = Assembler::splitString(expression, "(?:\\+|-|[^-\\+\\s]+)");
     bool minusSign = false;
-    for (string e : elems)
+    unsigned i = 0;
+    SymbolTable::Symbol *symbol = symbTable->getSymbol(name);
+
+    for (string s : elems)
     {
-        if (e == "+")
-            minusSign = false;
-        else if (e == "-")
-            minusSign = true;
-        else if (!Assembler::isLiteral(e))
-            symbols.push_front(make_pair(!minusSign, e));
+        if (s == "+" || s == "-")
+        {
+            if ((i & 1) || i++ == 0)
+                minusSign = s == "-";
+            else
+                throw SyntaxError(".equ: Invalid expression for symbol " + name);
+        }
+        else
+        {
+            if (i & 1)
+                throw SyntaxError(".equ: Invalid expression for symbol " + name);
+            else if (Assembler::isLiteral(s))
+                symbol->value += Assembler::parseInt(s);
+            else
+                symbols.push_back(make_pair(!minusSign, s));
+        }
+        ++i;
     }
+
+    if (!(i & 1))
+        throw SyntaxError(".equ: Invalid expression for symbol " + name);
+    if (symbols.size() == 0)
+        symbol->defined = true;
 }
 
 UncalculatedSymbolsTable::Symbol *UncalculatedSymbolsTable::get(string name)
@@ -26,108 +45,88 @@ UncalculatedSymbolsTable::Symbol *UncalculatedSymbolsTable::get(string name)
     return ret == symbols.end() ? nullptr : ret->second;
 }
 
-bool UncalculatedSymbolsTable::Symbol::calculateValue(UncalculatedSymbolsTable *uTable, SymbolTable *symbTable, RelocationTable *relTable)
+void UncalculatedSymbolsTable::Symbol::calculateValue(UncalculatedSymbolsTable *uTable, SymbolTable *symbTable, RelocationTable *relTable)
 {
-    if (expression == "")
-        return false;
+    if (symbols.size() == 0)
+        return;
 
-    bool ret = true;
+    set<string> used_equ_symbols;
+    bool extern_found = false;
+    list<pair<bool, string>> to_remove;
+    used_equ_symbols.insert(name);
 
-    string updated_expresion = "";
-    bool minusSign = false;
-    unsigned i = 0;
-
-    list<string> elems = Assembler::splitString(expression, "(?:\\+|-|[^-\\+\\s]+)");
-    for (string s : elems)
+    for (auto s : symbols)
     {
-        if (s == "+" || s == "-")
+        bool defined = parseOperand(s.second, symbTable, !s.first);
+        if (!defined)
         {
-            if ((i & 1) || i++ == 0)
-                minusSign = s == "-";
-            else
-                throw SyntaxError();
-        }
-        else
-        {
-            if (i & 1)
-                throw SyntaxError();
+            if (symbTable->getExternSymbol(s.second)) {
+                index.add(nullptr, true);
+                extern_found = true;
+            }
             else
             {
-                bool status;
-                value += parseOperand(s, symbTable, relTable, minusSign, &status) * (minusSign ? -1 : 1);
-                if (!status)
+                Symbol *symbol = uTable->get(s.second);
+                if (symbol)
                 {
-                    if (symbTable->getExternSymbol(s) || uTable->get(s) && uTable->get(s)->extern_)
-                    {
-                        extern_ = true;
-                        index.add(nullptr, true);
-                    }
-                    else
-                    {
-                        ret = false;
-                        updated_expresion.append((minusSign ? "-" : "+") + s);
-                    }
+                    if (used_equ_symbols.find(s.second) != used_equ_symbols.end())
+                        throw SyntaxError(".equ: Loop detected in the definition of symbol " + name);
+
+                    used_equ_symbols.insert(s.second);
+                    SymbolTable::Symbol *symb = symbTable->getSymbol(name);
+                    SymbolTable::Symbol *symb2 = symbTable->getSymbol(name);
+                    symb->value += symb2->value;
+                    for (auto newSymbol : symbol->symbols)
+                        symbols.push_back(make_pair(s.first ? newSymbol.first : !newSymbol.first, newSymbol.second));
+                    to_remove.push_back(s);
                 }
                 else
-                {
-                    if (uTable->get(s))
-                    {
-                    /*    if (uTable->get(s)->extern_)
-                        {
-                            SymbolTable::Symbol *symb = symbTable->getSymbol(s);
-                            index.add(nullptr, true);
-                            if (symb->section)
-                                index.add(symb->section, !minusSign);
-                        }
-                    */}
-                    else if (symbTable->getSymbol(s) && symbTable->getSymbol(s)->section)
-                    {
-                        index.add(symbTable->getSymbol(s)->section, !minusSign);
-                        symbols.remove(make_pair(!minusSign, s));
-                    }
-                }
+                    throw SyntaxError("Undefined symbol: " + s.second);
             }
         }
-
-        ++i;
     }
 
-    if (!(i & 1))
-        throw SyntaxError();
+    for (auto t : to_remove)
+        symbols.remove(t);
 
-    expression = updated_expresion;
-    return ret;
+    checkIndex(symbTable);
+    SymbolTable::Symbol *symbol = symbTable->getSymbol(name);
+    symbol->defined = !extern_found;
 }
 
-word UncalculatedSymbolsTable::Symbol::parseOperand(string operand, SymbolTable *symbTable, RelocationTable *relTable, bool minusSign, bool *status)
+bool UncalculatedSymbolsTable::Symbol::parseOperand(string operand, SymbolTable *symbTable, bool minusSign)
 {
     word number;
+    bool defined = true;
+
     if (Assembler::isLiteral(operand))
-    {
         number = Assembler::parseInt(operand);
-        if (status)
-            *status = true;
-    }
     else
     {
         SymbolTable::Symbol *symb = symbTable->getSymbol(operand);
         if (symb && symb->defined)
         {
             number = symb->value;
-            if (status)
-                *status = true;
+            if (symb->section)
+                index.add(symb->section, !minusSign);
         }
         else
         {
             number = 0;
             if (!symb)
                 symbTable->insertSymbol(operand, false);
-            if (status)
-                *status = false;
+            defined = false;
         }
     }
 
-    return number;
+    if (number != 0)
+    {
+        SymbolTable::Symbol *symbol = symbTable->getSymbol(name);
+        if (symbol)
+            symbol->value += number * (minusSign ? -1 : 1);
+    }
+
+    return defined;
 }
 
 void UncalculatedSymbolsTable::add(string name, string expression)
@@ -135,137 +134,19 @@ void UncalculatedSymbolsTable::add(string name, string expression)
     if (get(name))
         throw SymbolRedefinitionError(name);
 
-    Symbol *symbol = new Symbol(name, expression);
-    bool calculated = symbol->calculateValue(this, symbTable, relTable);
-
-    symbTable->insertSymbol(name, calculated, symbol->value);
-    auto symb = symbTable->getSymbol(name);
-    if (calculated)
-        symbol->checkIndex(symbTable);
-    else
-        symb->section = nullptr;
-
+    symbTable->insertSymbol(name, false);
+    Symbol *symbol = new Symbol(name, expression, symbTable);
     symbols[name] = symbol;
 }
 
-void UncalculatedSymbolsTable::write(ofstream &output) const
+void UncalculatedSymbolsTable::calculateAll()
 {
-    output << "=== Uncalculated symbols ===" << endl;
-    if (symbols.empty())
-    {
-        output << "No symbols" << endl;
-        return;
+    for (auto s : symbols)
+        s.second->calculateValue(this, symbTable, relTable);
+    for (auto s : symbols) {
+        SymbolTable:: Symbol *symb = symbTable->getSymbol(s.second->name);
+        symb->defined = true;
     }
-
-    output << left << setw(10) << setfill(' ') << "Name";
-    output << left << setw(12) << setfill(' ') << "Expression";
-    output << left << setw(8) << setfill(' ') << "Value";
-    output << endl;
-
-    for (auto symb : symbols)
-    {
-        Symbol *s = symb.second;
-        if (s->expression != "")
-        {
-            output << left << setw(10) << setfill(' ') << s->name;
-            output << left << setw(12) << setfill(' ') << s->expression;
-            output << left << setw(8) << setfill(' ') << s->value;
-            output << endl;
-        }
-    }
-}
-
-bool UncalculatedSymbolsTable::calculateAll()
-{
-    bool change;
-    do
-    {
-        change = false;
-        for (auto sym : symbols)
-        {
-            Symbol *s = sym.second;
-            bool calculated = s->calculateValue(this, symbTable, relTable);
-            SymbolTable::Symbol *symb = symbTable->getSymbol(s->name);
-            if (symb)
-            {
-                symb->defined |= calculated;
-                symb->value = s->value;
-                if (calculated)
-                    symb->clearFLink();
-            }
-            change |= calculated;
-        }
-    } while (change);
-
-    list<pair<bool, string>> to_remove;
-
-    do
-    {
-        change = false;
-        for (auto symb : symbols)
-        {
-            Symbol *s = symb.second;
-            bool found = false;
-            for (auto symb : s->symbols)
-            {
-                Symbol *symbol = get(symb.second);
-                if (symbol)
-                {
-                    change = found = true;
-                    if (!symbol->defined)
-                        continue;
-
-                    to_remove.push_back(symb);
-                    s->value += symbol->value;
-
-                    SymbolTable::Symbol *sym = symbTable->getSymbol(symbol->name);
-                    if (sym->section)
-                        s->index.add(sym->section, symb.first);
-                    for (auto sy : symbol->symbols)
-                    {
-                        if (!get(sy.second))
-                        {
-                            s->index.add(nullptr, true);
-                            to_remove.push_back(sy);
-                        }
-                        else
-                            s->symbols.push_back(sy);
-                    }
-                }
-            }
-            if (!found)
-            {
-                if (!symbTable->getSymbol(s->name)->section)
-                {
-                    s->checkIndex(symbTable);
-                    change = true;
-                }
-                s->defined = true;
-            }
-            for (auto r : to_remove)
-                s->symbols.remove(r);
-            to_remove.clear();
-        }
-
-    } while (change);
-
-    bool ret = true;
-    for (auto symb : symbols)
-    {
-        Symbol *s = symb.second;
-        if (s->expression != "")
-            ret = false;
-        else
-            s->checkIndex(symbTable);
-
-        //     delete s;
-    }
-
-    relTable->add(symbols);
-
-    // symbols.clear();
-
-    return ret;
 }
 
 UncalculatedSymbolsTable::~UncalculatedSymbolsTable()
