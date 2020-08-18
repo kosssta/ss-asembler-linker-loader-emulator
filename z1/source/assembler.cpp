@@ -123,12 +123,26 @@ void Assembler::processCommand(Instruction *instr)
             throw SyntaxError(instr->operation + " has 2 arguments");
     }
 
+    unsigned op_size;
     if (instructionDetails.operand_size == 2)
-        op_code |= 1 << 2;
-    else if (instructionDetails.operand_size == -1)
+    {
+        op_size = 2;
         op_code |= 1 << 2;
 
-    unsigned op_size = instructionDetails.operand_size == -1 ? 2 : instructionDetails.operand_size;
+        if (instr->op1 != "" && regex_match(instr->op1, regex(".*%[A-Za-z0-9]+[hl].*")) ||
+            instr->op2 != "" && regex_match(instr->op2, regex(".*%[A-Za-z0-9]+[hl].*")))
+            throw SyntaxError("Instruction " + instr->operation + " required 2-bytes operands");
+    }
+    else if (instructionDetails.operand_size == 1)
+        op_size = 1;
+    else if (instructionDetails.operand_size == -1)
+    {
+        op_size = 2;
+        op_code |= 1 << 2;
+        if (instr->op1 != "" && regex_match(instr->op1, regex(".*%[A-Za-z0-9]+[hl].*")) ||
+            instr->op2 != "" && regex_match(instr->op2, regex(".*%[A-Za-z0-9]+[hl].*")))
+            op_size = 1;
+    }
 
     current_section->bytes.push_back(op_code);
 

@@ -3,6 +3,7 @@
 
 .text
 main:
+
 mov $F, %r0
 mov %r0, data_out
 halt
