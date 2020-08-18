@@ -31,6 +31,7 @@ public:
         string expression;
         bool extern_ = false;
         word value;
+        bool defined = false;
         RelocationIndex index;
         list<pair<bool, string>> symbols;
 

@@ -205,24 +205,42 @@ bool UncalculatedSymbolsTable::calculateAll()
         for (auto symb : symbols)
         {
             Symbol *s = symb.second;
+            bool found = false;
             for (auto symb : s->symbols)
             {
                 Symbol *symbol = get(symb.second);
                 if (symbol)
                 {
-                    change = true;
+                    change = found = true;
+                    if (!symbol->defined)
+                        continue;
+
                     to_remove.push_back(symb);
                     s->value += symbol->value;
 
                     SymbolTable::Symbol *sym = symbTable->getSymbol(symbol->name);
                     if (sym->section)
                         s->index.add(sym->section, symb.first);
-                    s->index.add(sym->section, symb.first);
                     for (auto sy : symbol->symbols)
                     {
-                        s->symbols.push_back(sy);
+                        if (!get(sy.second))
+                        {
+                            s->index.add(nullptr, true);
+                            to_remove.push_back(sy);
+                        }
+                        else
+                            s->symbols.push_back(sy);
                     }
                 }
+            }
+            if (!found)
+            {
+                if (!symbTable->getSymbol(s->name)->section)
+                {
+                    s->checkIndex(symbTable);
+                    change = true;
+                }
+                s->defined = true;
             }
             for (auto r : to_remove)
                 s->symbols.remove(r);
