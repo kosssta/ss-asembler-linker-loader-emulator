@@ -115,7 +115,7 @@ void SymbolTable::write(ofstream &output)
     for (auto &s : symbols)
     {
         output << left << setw(11) << setfill(' ') << s.name;
-        output << left << setw(8) << setfill(' ') << s.value;
+        output << left << setw(8) << setfill(' ') << hex << s.value;
         output << left << setw(8) << setfill(' ') << (s.section ? s.section->id : 0);
         output << left << setw(9) << setfill(' ') << (s.defined ? "true" : "false");
         output << left << setw(9) << setfill(' ') << (s.global ? "true" : "false");

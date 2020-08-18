@@ -12,7 +12,7 @@ void RelocationTable::add(string name, Section *section, unsigned offset, Reloca
 
 bool operator==(const RelocationTable::Record &r1, const RelocationTable::Record &r2)
 {
-    return r1.name == r2.name && r1.offset == r2.offset && r1.section == r2.section;
+    return r1.name == r2.name && r1.offset == r2.offset && r1.section == r2.section && r1.type == r2.type && r1.plus == r2.plus;
 }
 
 void RelocationTable::write(ofstream &output, SectionTable *sections)
@@ -57,9 +57,9 @@ void RelocationTable::write(ofstream &output, SectionTable *sections)
 
 void RelocationTable::add(unordered_map<string, UncalculatedSymbolsTable::Symbol *> symbols)
 {
-    forward_list<Record> tmp;
+    // forward_list<Record> tmp;
     forward_list<Record> to_remove;
-
+    /*
     for (auto sym : symbols)
     {
         auto *s = sym.second;
@@ -73,11 +73,45 @@ void RelocationTable::add(unordered_map<string, UncalculatedSymbolsTable::Symbol
             }
         }
     }
+*/
 
+    for (Record r : records)
+    {
+        auto s = symbols.find(r.name);
+        if (s == symbols.end())
+            continue;
+
+        UncalculatedSymbolsTable::Symbol *usymbol = s->second;
+        SymbolTable::Symbol *symbol = symbTable->getSymbol(usymbol->name);
+
+        if (symbol->defined && symbol->global && symbol->section)
+        {
+            word val = 0;
+            val |= symbol->section->bytes[r.offset] & 0xff;
+            if (r.type != R_X86_64_8)
+                val |= symbol->section->bytes[r.offset + 1] << 8;
+
+            val -= symbol->value;
+
+            symbol->section->bytes[r.offset] = val & 0xff;
+            if (r.type != R_X86_64_8)
+                symbol->section->bytes[r.offset + 1] = val >> 8 & 0xff;
+        }
+
+        to_remove.push_front(r);
+
+        if (symbol->defined && symbol->section)
+            records.push_front(Record(symbol->global ? symbol->name : symbol->section->name, r.section, r.offset, r.type, r.plus));
+
+        for (auto s : usymbol->symbols)
+            records.push_front(Record(s.second, r.section, r.offset, r.type, !(s.first ^ r.plus)));
+    }
     for (Record r : to_remove)
         records.remove(r);
-    for (Record r : tmp)
-        records.push_front(r);
+    to_remove.clear();
+
+    //  for (Record r : tmp)
+    //    records.push_front(r);
 }
 
 void RelocationTable::replace()
