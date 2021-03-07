@@ -1,2 +1,2 @@
 build:
-	g++ -g -o asembler ../source/* -I../header
+	g++ -g -o asembler ../src/source/* -I../src/header

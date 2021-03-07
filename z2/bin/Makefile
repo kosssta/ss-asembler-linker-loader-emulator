@@ -1,2 +1,2 @@
 build:
-	g++ -g -o emulator ../source/* -I../header -pthread
+	g++ -g -o emulator ../src/source/* -I../src/header -pthread

@@ -1,0 +1,11 @@
+=== Symbol table ===
+Name       Value   Section Defined  Global   Id      
+.text      0       1       true     false    1       
+foo        0       1       true     true     2       
+
+=== Sections ===
+.text (RWXP):
+Length = 39
+64 6C 02 00 22 64 00 01 00 20 8C 00 02 00 22 44 6E 25 00 4C 22 74 00 01 00 22 4C 22 24 6E E0 FF 54 22 54 22 4C 20 74 00 02 00 22 4C 22 24 6E CF FF 54 22 54 28 6C 28 20 10 
+
+

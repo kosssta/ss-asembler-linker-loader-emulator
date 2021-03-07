@@ -1,0 +1,25 @@
+=== Symbol table ===
+Name       Value   Section Defined  Global   Id      
+.data      0       1       true     false    1       
+.sekcija   0       2       true     false    2       
+A          5e      2       true     true     3       
+C          6e      2       true     true     4       
+D          20      1       true     true     5       
+B          0       0       false    true     6       
+
+=== Sections ===
+.data (RWP):
+Length = 24
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 E0 FF 00 00 
+
+.sekcija (RW):
+Length = 45
+
+.rel.data
+Length = 3
+Id        Offset  Type           Plus 
+1         20      R_X86_64_16    +    
+6         22      R_X86_64_16    -    
+3         22      R_X86_64_16    +    
+
+

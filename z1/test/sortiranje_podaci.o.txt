@@ -1,0 +1,12 @@
+=== Symbol table ===
+Name       Value   Section Defined  Global   Id      
+.data      0       1       true     false    1       
+len        0       1       true     true     2       
+arr        2       1       true     true     3       
+
+=== Sections ===
+.data (RWP):
+Length = c
+05 00 FB FF F9 FF 00 00 09 00 08 00 
+
+

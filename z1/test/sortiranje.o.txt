@@ -1,0 +1,34 @@
+=== Symbol table ===
+Name       Value   Section Defined  Global   Id      
+.text      0       1       true     false    1       
+.bss       0       2       true     false    2       
+len        0       0       false    true     3       
+arr        0       0       false    true     4       
+data_out   0       0       false    true     5       
+main       0       1       true     true     6       
+
+=== Sections ===
+.text (RWXP):
+Length = f3
+8C 00 00 00 80 00 00 34 6E E7 00 44 6E E3 00 64 80 00 00 2C 7C 00 02 00 2C 64 00 00 00 20 8C 20 2C 34 6E 3A 00 64 20 22 6C 00 02 00 22 8C 2C 22 34 6E 22 00 64 60 00 00 24 64 62 00 00 26 8C 26 24 44 6E E3 FF 5C 24 26 64 24 60 00 00 64 26 62 00 00 2C 6E D2 FF 6C 00 02 00 20 2C 6E BF FF 64 00 00 00 2A 64 00 00 00 28 A4 00 00 00 2C 64 6A 00 00 20 64 20 26 9C 00 0F 00 26 C4 20 00 04 00 9C 00 FF 0F 20 8C 26 00 09 00 44 6E 09 00 6C 00 30 00 26 2C 6E 0A 00 6C 00 41 00 26 74 00 0A 00 26 64 26 68 00 00 6C 00 02 00 28 8C 00 00 00 20 3C 6E BF FF 74 00 02 00 28 64 68 00 00 22 64 22 80 00 00 74 00 02 00 28 8C 28 00 00 00 44 6E E8 FF 34 6E E4 FF 6C 00 02 00 2A 64 6A 00 00 20 64 00 00 00 28 64 00 20 00 80 00 00 8C 2A 2C 3C 6E 81 FF 00 
+
+.bss (RW):
+Length = a
+
+.rel.text
+Length = c
+Id        Offset  Type           Plus 
+3         5       R_X86_64_16    +    
+3         11      R_X86_64_16    +    
+4         36      R_X86_64_16    +    
+4         3b      R_X86_64_16    +    
+4         4b      R_X86_64_16    +    
+4         50      R_X86_64_16    +    
+4         70      R_X86_64_16    +    
+2         a4      R_X86_64_16    +    
+2         bb      R_X86_64_16    +    
+5         c1      R_X86_64_16    +    
+4         dc      R_X86_64_16    +    
+5         e9      R_X86_64_16    +    
+
+
